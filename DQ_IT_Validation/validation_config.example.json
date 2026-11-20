@@ -1,0 +1,68 @@
+{
+  "_comment": "Validation config for one database (it_validation.<db>.config_path in backend/dq_config.json). Copy per database and keep only the source section it reads: 'oracle', 'mariadb' or 'sqlserver'. The real files hold passwords - keep them out of git.",
+
+  "_comment_oracle": "Insight7 / RIMDocs. dsn: host:port/service.",
+  "oracle": {
+    "username": "",
+    "password": "",
+    "dsn": "host:1521/service"
+  },
+
+  "_comment_mariadb": "HAQ. jdbc_url optional (else the pipeline's own URL); ssl optional (else read from the URL).",
+  "mariadb": {
+    "user": "",
+    "password": "",
+    "jdbc_url": "jdbc:mariadb://host:3306/database",
+    "ssl": false
+  },
+
+  "_comment_sqlserver": "LIFT. Windows login: give the domain (or keep domain=NA in jdbc_url) and the user without it. jdbc_url optional - blank uses the pipeline's own URL (CDC pipelines keep theirs in a resource file, so set it or capture it on the page). host / port / database / instance override parts of the URL. driver: pymssql (pip install pymssql) or jdbc (needs Java, pip install jaydebeapi JPype1, and driver_jar = path to the mssql-jdbc .jar). trusted: true signs in as the account the portal runs under (Windows) instead of user/password. encrypt: true forces TLS (needs pymssql 2.3+).",
+  "sqlserver": {
+    "user": "SA--SA-PRD-LIFT-INTA",
+    "password": "",
+    "domain": "NA",
+    "jdbc_url": "jdbc:sqlserver://OPCITSNAW01EP:1433;databaseName=LIFT;encrypt=true;trustServerCertificate=true",
+    "driver": "pymssql",
+    "driver_jar": "",
+    "trusted": false,
+    "encrypt": true
+  },
+
+  "_comment_snowflake": "Read login for the Snowflake side. role can be a list - each is tried until one can read the table.",
+  "snowflake": {
+    "account": "fub18184",
+    "user": "",
+    "private_key_path": "C:/keys/rsa_key.p8",
+    "private_key_password": "",
+    "role": ["ROLE_A", "ROLE_B"],
+    "warehouse": "",
+    "database": ""
+  },
+
+  "_comment_snowflake_save": "Where results are written for the IT Checks page (scheduled run, and 'Write to Snowflake' in Pipeline Studio).",
+  "snowflake_save": {
+    "account": "",
+    "user": "",
+    "private_key_path": "",
+    "private_key_password": "",
+    "role": "",
+    "warehouse": "",
+    "database": "",
+    "stg_schema": "",
+    "core_schema": ""
+  },
+
+  "validation": {
+    "database_name": "LIFT",
+    "report_path": "",
+    "excluded_columns": [],
+    "parallel_execution": true,
+    "max_parallel_tables": 5,
+    "max_parallel_pipelines": 3,
+    "connection_pool_size": 7,
+    "table_timeout": 60,
+    "max_timeout_retries": 3,
+    "oracle_parallel_degree": 8,
+    "validate_all_tables": true
+  }
+}

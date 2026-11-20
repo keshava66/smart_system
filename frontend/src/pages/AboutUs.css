@@ -1,0 +1,161 @@
+/* About us. J&J palette: red, black, white core; warm greys as neutrals. Flat.
+   Width rules follow the page's own width (it sits beside the sidebar);
+   the one-screen fit kicks in through .is-fit, set by AboutUs.jsx. */
+.au {
+  --red: #eb1700; --black: #000; --white: #fff;
+  --g1: #f1efed; --g2: #e8e6e3; --g3: #d5cfc9; --g5: #a39992; --g7: #6e6259; --g8: #312c2a;
+  --display: "JohnsonDisplay", Arial, sans-serif; --text: "JohnsonText", Arial, sans-serif;
+  --s1: 8px; --s2: 16px; --s3: 24px; --s4: 32px; --s6: 48px;
+  /* vertical rhythm and circle size follow the screen height */
+  --v: clamp(6px, 1.5vh, 16px); --av: clamp(40px, 7.2vh, 96px);
+  container: au / inline-size;
+  min-height: 100%;
+  background: var(--white); color: var(--g8);
+  font-family: var(--text); font-size: 15px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.au *, .au *::before, .au *::after { box-sizing: border-box; }
+.au ::selection { background: var(--red); color: var(--white); }
+.au h1, .au h3 { text-wrap: balance; }
+.au p, .au dd { text-wrap: pretty; }
+
+/* ---------- page grid: stacked by default ---------- */
+.au-page { display: grid; grid-template-columns: 1fr; gap: var(--s4); max-width: 1760px; margin: 0 auto; padding: var(--s3); }
+
+/* breadcrumb */
+.au-crumbs ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--g7); }
+.au-crumbs a { color: var(--g7); text-decoration: none; padding: 2px 6px; border-radius: 6px; }
+.au-crumbs a:hover { color: var(--red); background: var(--g1); }
+.au-crumbs a:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.au-crumbs svg { width: 10px; height: 10px; display: block; fill: none; stroke: var(--g5); stroke-width: 1.6; }
+.au-crumbs [aria-current] { display: inline-block; padding: 3px 10px; border-radius: 999px; background: rgba(235, 23, 0, .07); color: var(--g8); font-weight: 500; }
+
+/* ---------- left column ---------- */
+.au-intro { display: grid; grid-template-columns: 1fr; column-gap: var(--s4); container-type: inline-size; }
+.au h1 { font-family: var(--display); font-weight: 400; color: var(--red); font-size: 48px; line-height: 1; letter-spacing: -.015em; margin: 0; white-space: nowrap; }
+/* one line under the title, sized to the column */
+.au-tagline { font-family: var(--display); font-weight: 300; font-size: clamp(14px, 4.9cqi, 22px); line-height: 1.3; color: var(--g8); margin: var(--v) 0 var(--s3); white-space: nowrap; }
+.au-block { border-top: 1px solid var(--g8); padding: var(--v) 0 calc(var(--v) * 2); }
+.au-block h2 { margin: 0 0 calc(var(--v) * .6); font-family: var(--text); font-size: 15px; font-weight: 700; color: var(--black); }
+.au-block p { margin: 0; max-width: 34em; }
+.au-mission { font-family: var(--display); font-weight: 400; font-size: 1.45em; line-height: 1.2; color: var(--red); }
+.au-does { margin: 0; display: grid; row-gap: calc(var(--v) * .7); }
+.au-does div { position: relative; padding-left: 16px; line-height: 1.45; }
+.au-does div::before { content: ""; position: absolute; left: 0; top: .68em; width: 8px; height: 2px; background: var(--red); }
+.au-does dt, .au-does dd { display: inline; }
+.au-does dt { font-weight: 700; color: var(--black); margin-right: .35em; }
+.au-does dd { margin: 0; }
+
+/* ---------- right column: the team ---------- */
+.au-board { display: flex; flex-direction: column; background: var(--g1); }
+.au-top { display: grid; grid-template-columns: 1fr; margin: 0 var(--s2); border-bottom: 1px solid var(--g3); }
+.au-top .au-panel + .au-panel { border-top: 1px solid var(--g3); }
+.au-panel { background: var(--g1); }
+.au-panel-title { margin: 0; font-family: var(--text); font-size: 15px; font-weight: 700; line-height: 1.55; text-align: center; padding: calc(var(--v) * 1.4) var(--s3) 0; color: var(--black); }
+.au-core { display: flex; flex-direction: column; padding-bottom: var(--s2); }
+.au-groups { display: grid; grid-template-columns: 1fr; gap: var(--s2); padding: calc(var(--v) * 1.4) var(--s2) 0; }
+.au-group { display: flex; flex-direction: column; background: var(--white); padding-bottom: calc(var(--v) * 2); container-type: inline-size; }
+.au-tree { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.au-bar { background: var(--red); color: var(--white); text-align: center; padding: calc(var(--v) * .9) var(--s2); }
+.au-bar h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(16px, 6.2cqi, 24px); /* sized to the group, so the title stays on one line */ line-height: 1.15; }
+.au-sub { margin: 2px 0 0; font-size: 14px; font-weight: 500; color: var(--white); }
+
+/* rows and connectors */
+.au-row { list-style: none; margin: 0; display: flex; justify-content: center; padding: calc(var(--v) * 1.5) var(--s2) 0; }
+.au-top .au-row { padding-bottom: calc(var(--v) * 1.5); }
+.au-row.pair { display: grid; grid-template-columns: 1fr 1fr; }
+.au-link { position: relative; height: calc(var(--v) * 2.6); margin: calc(var(--v) * .6) var(--s2) 0; }
+.au-link::before, .au-link::after { content: ""; position: absolute; border-color: var(--g5); border-style: solid; }
+/* one above two: stem, then a bracket opening down */
+.au-link.split::before { left: 50%; top: 0; height: 50%; border-width: 0 0 0 1px; }
+.au-link.split::after { left: 25%; right: 25%; top: 50%; bottom: 0; border-width: 1px 1px 0 1px; }
+/* two into one: bracket closing up, then a stem */
+.au-link.join::before { left: 25%; right: 25%; top: 0; height: 50%; border-width: 0 1px 1px 1px; }
+.au-link.join::after { left: 50%; top: 50%; bottom: 0; border-width: 0 0 0 1px; }
+.au-link + .au-row { padding-top: calc(var(--v) * .6); }
+
+/* person */
+.au-person { text-align: center; padding: 0 var(--s1); min-width: 0; }
+.au-photo { width: var(--av); height: var(--av); margin: 0 auto calc(var(--v) * .8); border-radius: 50%; display: grid; place-items: center; overflow: hidden;
+  background: var(--g1); font-family: var(--display); font-weight: 300; font-size: calc(var(--av) * .34); letter-spacing: .02em; color: var(--g8); }
+.au-top .au-photo { background: var(--white); }
+.au-photo img { width: 100%; height: 100%; object-fit: cover; }
+.au-office { display: block; width: calc(var(--av) * .42); height: calc(var(--av) * .42); background: var(--red);
+  -webkit-mask: url("/icons/JJ_Icon_Office_RGB.svg") center / contain no-repeat; mask: url("/icons/JJ_Icon_Office_RGB.svg") center / contain no-repeat; }
+.au-name { font-weight: 700; color: var(--black); }
+.au-role { font-size: 13px; color: var(--g7); margin-top: 2px; }
+
+/* footer */
+.au-foot { display: grid; grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 4px var(--s3); padding: calc(var(--v) * .7) 0; border-top: 1px solid var(--g3); font-size: 12.5px; color: var(--g7); }
+.au-foot b { color: var(--red); font-weight: 700; }
+/* the logo file has blank space around the wordmark; crop it to the letters */
+.au-logo { display: block; width: 157px; height: 15px; overflow: hidden; }
+.au-logo img { display: block; height: 33px; width: auto; margin: -9px 0 0 -9px; }
+
+/* ---------- wider pages ---------- */
+@container au (min-width: 761px) {
+  .au-page { padding: var(--s4) var(--s6) 0; }
+  .au-intro { grid-template-columns: 1fr 1fr; }
+  .au-intro h1, .au-intro .au-tagline { grid-column: 1 / -1; }
+  .au-top { grid-template-columns: 1fr 1fr; }
+  .au-top .au-panel + .au-panel { border-top: 0; }
+  .au-top { position: relative; }
+  .au-top::before { content: ""; position: absolute; left: 50%; top: var(--s2); bottom: var(--s2); border-left: 1px solid var(--g3); }
+  .au-foot { grid-template-columns: 1fr auto 1fr; justify-items: stretch; }
+  .au-foot .au-credit { justify-self: end; }
+}
+@container au (min-width: 901px) {
+  .au-groups { grid-template-columns: 1fr 1fr; }
+}
+@container au (min-width: 1101px) {
+  .au-page { grid-template-columns: clamp(340px, 29cqw, 540px) 1fr; grid-template-rows: auto minmax(0, 1fr) auto; gap: 0 clamp(32px, 3.5cqw, 64px); padding-top: clamp(16px, 3.6vh, 44px); }
+  .au-crumbs { grid-column: 1 / -1; margin: 0 0 calc(var(--v) * 1.6); }
+  .au-foot { grid-column: 1 / -1; margin-top: calc(var(--v) * 1.2); }
+  .au-intro { display: flex; flex-direction: column; }
+  .au-tagline { margin-bottom: calc(var(--v) * 2.5); }
+}
+@container au (min-width: 1101px) and (max-width: 1320px) {
+  .au h1 { font-size: 44px; }
+  .au-does { row-gap: calc(var(--v) * .45); }
+  .au-does div { font-size: .92em; line-height: 1.4; }
+}
+@container au (min-width: 1401px) {
+  .au-role { white-space: nowrap; }
+}
+
+/* ---------- one screen: set when the page is wide and tall enough ---------- */
+.au.is-fit { height: 100%; overflow: hidden; font-size: clamp(13px, 1.7vh, 15px); }
+.au.is-fit .au-page { height: 100%; }
+.au.is-fit .au-intro, .au.is-fit .au-board { min-height: 0; }
+.au.is-fit .au-core, .au.is-fit .au-groups { flex: 1; }
+
+/* shorter screens: owner and sponsor sit beside their circle */
+@media (max-height: 1040px) {
+  .au.is-fit .au-top .au-person { display: grid; grid-template-columns: auto auto; column-gap: var(--s2); align-items: center; text-align: left; }
+  .au.is-fit .au-top .au-photo { margin: 0; grid-row: span 2; }
+  .au.is-fit .au-top .au-name { align-self: end; }
+  .au.is-fit .au-top .au-role { align-self: start; }
+  .au.is-fit .au-top .au-name:last-child { grid-row: span 2; align-self: center; } /* no role line */
+}
+@media (max-height: 900px) {
+  .au.is-fit h1 { font-size: 44px; }
+  .au.is-fit .au-tagline { margin-bottom: calc(var(--v) * 1.6); }
+  .au.is-fit .au-does { row-gap: calc(var(--v) * .5); }
+  .au.is-fit .au-does div { font-size: .95em; }
+}
+@media (max-height: 760px) {
+  .au.is-fit { --av: clamp(40px, 6.6vh, 96px); }
+  .au.is-fit h1 { font-size: 42px; }
+  .au.is-fit .au-tagline { margin-bottom: calc(var(--v) * 1.5); }
+  .au.is-fit .au-does { row-gap: calc(var(--v) * .45); }
+  .au.is-fit .au-does div { font-size: .9em; line-height: 1.4; }
+  .au.is-fit .au-block { padding-bottom: calc(var(--v) * 1.2); }
+  .au.is-fit .au-link { height: calc(var(--v) * 2); }
+}
+@media (max-height: 640px) {
+  .au.is-fit { --av: clamp(36px, 6vh, 96px); font-size: 12.5px; line-height: 1.45; }
+  .au.is-fit .au-mission { font-size: 1.3em; }
+  .au.is-fit .au-credit { display: none; }
+  .au.is-fit .au-panel-title { padding-top: var(--v); }
+  .au.is-fit h1 { font-size: 38px; }
+}

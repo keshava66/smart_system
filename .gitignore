@@ -1,0 +1,7 @@
+.idea/
+package-lock.json
+/DQ_IT_Validation/rimdocs_config.json
+/DQ_IT_Validation/insight_config.json
+/DQ_IT_Validation/mariadb_config.json
+/DQ_IT_Validation/lift_config.json
+__pycache__/

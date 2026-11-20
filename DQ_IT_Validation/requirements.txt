@@ -1,0 +1,7 @@
+snowflake-connector-python
+cryptography
+pandas
+requests
+oracledb
+paramiko
+pymssql>=2.3
