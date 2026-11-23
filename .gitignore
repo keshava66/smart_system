@@ -8,3 +8,7 @@ __pycache__/
 
 # Release check output and its signed-in browser profile
 /.release_check/
+
+# Server-local start scripts (copied from the .example files)
+/start_frontend.sh
+/start_backend.sh
