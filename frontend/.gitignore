@@ -25,3 +25,6 @@ dist-ssr
 *.env
 *.xml
 package-lock.json
+# Server runtime (scripts/frontend.sh)
+.env.server
+run/

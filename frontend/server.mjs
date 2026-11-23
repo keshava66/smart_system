@@ -5,14 +5,27 @@
 // the process hit EMFILE and crashed. Here conditional requests are answered
 // from a stat() alone, and every opened file is closed whatever the outcome.
 //
-// Run:   npm run build && npm start
-// Env:   PORT (3000), HOST (0.0.0.0), DIST_DIR (./dist),
-//        TLS_CERT + TLS_KEY (PEM paths, enables HTTPS), ACCESS_LOG (1, set 0 to silence)
+// A supervisor process runs WORKERS copies of the server, replaces any that
+// die, owns the log file and rotates it by size. In production start it with
+// scripts/frontend.sh, which also brings it back after a reboot (via cron).
+//
+// Env:   PORT (3000), HOST (0.0.0.0), DIST_DIR (./dist), WORKERS (2),
+//        TLS_CERT + TLS_KEY (PEM paths, enables HTTPS),
+//        LOG_FILE (unset: stdout), LOG_MAX_MB (50), LOG_KEEP (5),
+//        PID_FILE (unset: none), ACCESS_LOG (1, set 0 to log errors only)
+// Signals to the supervisor: TERM/INT stop gracefully, USR2 restarts workers
+// one at a time with no downtime (use after replacing the TLS certificate).
 
+import cluster from 'node:cluster';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
-import { existsSync, readFileSync } from 'node:fs';
-import { open, stat } from 'node:fs/promises';
+import net from 'node:net';
+import {
+  createWriteStream, existsSync, fstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync,
+} from 'node:fs';
+import { access, open, stat } from 'node:fs/promises';
+import readline from 'node:readline';
+import { createSecureContext } from 'node:tls';
 import { pipeline } from 'node:stream/promises';
 import { promisify } from 'node:util';
 import zlib from 'node:zlib';
@@ -60,6 +73,8 @@ const COMPRESS_MIN_BYTES = 1024;
 const COMPRESS_MAX_BYTES = 10 * 1024 * 1024;
 const COMPRESS_CACHE_BYTES = 64 * 1024 * 1024;
 const SHUTDOWN_GRACE_MS = 10_000;
+const DRAIN_IDLE_MS = 1_000;
+const HANDOFF_SETTLE_MS = 500;
 
 const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
 const CACHE_REVALIDATE = 'no-cache';
@@ -330,6 +345,16 @@ export function createStaticServer({ root, tls = null, accessLog = true, log = c
       return;
     }
 
+    if (req.url === '/healthz') {
+      try {
+        await access(appShell);
+        sendText(res, 200, 'ok');
+      } catch {
+        sendText(res, 503, 'build missing');
+      }
+      return;
+    }
+
     const target = resolveTarget(distRoot, req.url);
     if (!target) {
       sendText(res, 404, 'Not found');
@@ -372,6 +397,7 @@ export function createStaticServer({ root, tls = null, accessLog = true, log = c
 
   function writeAccessLog(req, res, startedAt) {
     if (!accessLog) return;
+    if (req.url === '/healthz' && res.statusCode === 200) return;
     const ms = Number(process.hrtime.bigint() - startedAt) / 1e6;
     const status = res.writableFinished ? res.statusCode : `${res.statusCode} aborted`;
     log.log(`${new Date().toISOString()} ${req.socket.remoteAddress} ${req.method} ${req.url} ${status} ${ms.toFixed(1)}ms`);
@@ -379,6 +405,7 @@ export function createStaticServer({ root, tls = null, accessLog = true, log = c
 
   function onRequest(req, res) {
     const startedAt = process.hrtime.bigint();
+    if (server.draining) res.setHeader('Connection', 'close');
     res.once('close', () => writeAccessLog(req, res, startedAt));
 
     handle(req, res).catch((error) => {
@@ -410,15 +437,67 @@ export function createStaticServer({ root, tls = null, accessLog = true, log = c
   return server;
 }
 
-function readConfig(env) {
+
+// Size-based rotation: frontend.log -> frontend.log.1 -> ... -> frontend.log.<keep>.
+export class RotatingLog {
+  constructor(file, { maxBytes, keep }) {
+    this.file = file;
+    this.maxBytes = maxBytes;
+    this.keep = keep;
+    mkdirSync(path.dirname(file), { recursive: true });
+    this.openStream();
+  }
+
+  openStream() {
+    // Open synchronously so the file exists before the first rotation check.
+    const fd = openSync(this.file, 'a');
+    this.size = fstatSync(fd).size;
+    this.stream = createWriteStream(null, { fd });
+    this.stream.on('error', (error) => process.stderr.write(`Log write to ${this.file} failed: ${error.message}\n`));
+  }
+
+  write(line) {
+    const text = `${line}\n`;
+    const bytes = Buffer.byteLength(text);
+    if (this.size > 0 && this.size + bytes > this.maxBytes) this.rotate();
+    this.stream.write(text);
+    this.size += bytes;
+  }
+
+  rotate() {
+    // The old stream keeps its descriptor, so writes still queued land in .1.
+    this.stream.end();
+    try {
+      for (let n = this.keep - 1; n >= 1; n -= 1) {
+        const older = `${this.file}.${n}`;
+        if (existsSync(older)) renameSync(older, `${this.file}.${n + 1}`);
+      }
+      if (existsSync(this.file)) renameSync(this.file, `${this.file}.1`);
+    } catch (error) {
+      process.stderr.write(`Log rotation of ${this.file} failed, continuing in the same file: ${error.message}\n`);
+    }
+    this.openStream();
+  }
+
+  close() {
+    return new Promise((resolve) => this.stream.end(resolve));
+  }
+}
+
+function readInteger(env, name, fallback, min, max) {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be a whole number from ${min} to ${max}, got "${raw}"`);
+  }
+  return value;
+}
+
+export function readConfig(env) {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const root = path.resolve(here, env.DIST_DIR || 'dist');
-  const port = Number(env.PORT || 3000);
-  const host = env.HOST || '0.0.0.0';
 
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`PORT must be a number between 1 and 65535, got "${env.PORT}"`);
-  }
   if (!existsSync(path.join(root, 'index.html'))) {
     throw new Error(`${path.join(root, 'index.html')} not found. Run "npm run build" first.`);
   }
@@ -426,10 +505,237 @@ function readConfig(env) {
     throw new Error('Set both TLS_CERT and TLS_KEY for HTTPS, or neither for HTTP.');
   }
 
-  const tls = env.TLS_CERT
-    ? { cert: readFileSync(env.TLS_CERT), key: readFileSync(env.TLS_KEY) }
+  let tlsOptions = null;
+  if (env.TLS_CERT) {
+    tlsOptions = { cert: readFileSync(env.TLS_CERT), key: readFileSync(env.TLS_KEY) };
+    try {
+      createSecureContext(tlsOptions);
+    } catch (error) {
+      throw new Error(`TLS_CERT / TLS_KEY are not a usable certificate and key: ${error.message}`, { cause: error });
+    }
+  }
+
+  return {
+    root,
+    port: readInteger(env, 'PORT', 3000, 1, 65535),
+    host: env.HOST || '0.0.0.0',
+    tls: tlsOptions,
+    workers: readInteger(env, 'WORKERS', 2, 1, 64),
+    accessLog: env.ACCESS_LOG !== '0',
+    logFile: env.LOG_FILE ? path.resolve(env.LOG_FILE) : null,
+    logMaxBytes: readInteger(env, 'LOG_MAX_MB', 50, 1, 10_240) * 1024 * 1024,
+    logKeep: readInteger(env, 'LOG_KEEP', 5, 1, 100),
+    pidFile: env.PID_FILE ? path.resolve(env.PID_FILE) : null,
+  };
+}
+
+const RESPAWN_DELAY_MS = 1_000;
+const CRASH_WINDOW_MS = 60_000;
+const MAX_CRASHES_PER_WINDOW = 10;
+
+function runPrimary(config) {
+  const logFile = config.logFile
+    ? new RotatingLog(config.logFile, { maxBytes: config.logMaxBytes, keep: config.logKeep })
     : null;
-  return { root, port, host, tls, accessLog: env.ACCESS_LOG !== '0' };
+  const write = (line) => (logFile ? logFile.write(line) : process.stdout.write(`${line}\n`));
+  const note = (message) => write(`${new Date().toISOString()} [supervisor] ${message}`);
+  const scheme = config.tls ? 'https' : 'http';
+
+  const retiring = new Set();
+  const crashTimes = [];
+  let stopping = false;
+  let reloading = false;
+
+  cluster.setupPrimary({ silent: Boolean(logFile) });
+
+  if (config.pidFile) {
+    mkdirSync(path.dirname(config.pidFile), { recursive: true });
+    writeFileSync(config.pidFile, `${process.pid}\n`);
+  }
+
+  function fork() {
+    const worker = cluster.fork();
+    if (logFile) {
+      for (const output of [worker.process.stdout, worker.process.stderr]) {
+        readline.createInterface({ input: output, crlfDelay: Infinity }).on('line', write);
+      }
+    }
+    worker.on('message', (message) => {
+      if (message?.type !== 'fatal') return;
+      if (reloading) {
+        note(`new worker cannot start (${message.reason}); the running workers keep serving`);
+        retiring.add(worker.id);
+        return;
+      }
+      note(`cannot start: ${message.reason}`);
+      stop(1);
+    });
+    return worker;
+  }
+
+  function retire(worker) {
+    return new Promise((resolve) => {
+      if (worker.isDead()) {
+        resolve();
+        return;
+      }
+      const killTimer = setTimeout(() => worker.process.kill('SIGKILL'), SHUTDOWN_GRACE_MS + 2_000);
+      worker.once('exit', () => {
+        clearTimeout(killTimer);
+        resolve();
+      });
+      try {
+        worker.send({ type: 'shutdown' });
+      } catch {
+        worker.process.kill('SIGTERM');
+      }
+    });
+  }
+
+  function waitUntilListening(worker) {
+    return new Promise((resolve) => {
+      const onListening = () => finish(true);
+      const onExit = () => finish(false);
+      const finish = (started) => {
+        worker.off('listening', onListening);
+        worker.off('exit', onExit);
+        resolve(started);
+      };
+      worker.once('listening', onListening);
+      worker.once('exit', onExit);
+    });
+  }
+
+  async function stop(code) {
+    if (stopping) return;
+    stopping = true;
+    note('shutting down');
+    await Promise.all(Object.values(cluster.workers).map(retire));
+    if (config.pidFile && existsSync(config.pidFile)
+      && readFileSync(config.pidFile, 'utf8').trim() === String(process.pid)) {
+      rmSync(config.pidFile, { force: true });
+    }
+    note('stopped');
+    if (logFile) await logFile.close();
+    process.exit(code);
+  }
+
+  async function reload() {
+    if (stopping || reloading) return;
+    reloading = true;
+    note('restarting workers one at a time');
+    for (const old of Object.values(cluster.workers)) {
+      if (stopping) break;
+      const started = await waitUntilListening(fork());
+      if (!started) {
+        note('restart stopped early: a new worker failed to start');
+        break;
+      }
+      retiring.add(old.id);
+      await retire(old);
+    }
+    reloading = false;
+    note('restart finished');
+  }
+
+  cluster.on('listening', (worker, address) => {
+    note(`worker ${worker.process.pid} serving ${config.root} on ${scheme}://${config.host}:${address.port}`);
+  });
+
+  cluster.on('exit', (worker, code, signal) => {
+    if (stopping) return;
+    if (retiring.delete(worker.id)) return;
+
+    const now = Date.now();
+    crashTimes.push(now);
+    while (crashTimes.length > 0 && now - crashTimes[0] > CRASH_WINDOW_MS) crashTimes.shift();
+    note(`worker ${worker.process.pid} exited (${signal || `code ${code}`}), starting a replacement`);
+
+    if (crashTimes.length > MAX_CRASHES_PER_WINDOW) {
+      note(`${crashTimes.length} worker crashes within a minute, stopping`);
+      stop(1);
+      return;
+    }
+    setTimeout(() => {
+      if (!stopping) fork();
+    }, RESPAWN_DELAY_MS);
+  });
+
+  process.on('SIGTERM', () => stop(0));
+  process.on('SIGINT', () => stop(0));
+  process.on('SIGUSR2', () => reload());
+  process.on('uncaughtException', (error) => {
+    note(`supervisor error, exiting: ${error.stack || error.message}`);
+    process.exit(1);
+  });
+
+  note(`starting ${config.workers} worker(s), pid ${process.pid}`);
+  for (let i = 0; i < config.workers; i += 1) fork();
+}
+
+function reportFatal(reason) {
+  if (process.send) {
+    process.send({ type: 'fatal', reason }, () => process.exit(1));
+  } else {
+    console.error(`Cannot start: ${reason}`);
+    process.exit(1);
+  }
+}
+
+function runWorker(config) {
+  let server;
+  try {
+    server = createStaticServer(config);
+  } catch (error) {
+    reportFatal(error.message);
+    return;
+  }
+
+  server.on('error', (error) => {
+    reportFatal(error.code === 'EADDRINUSE'
+      ? `port ${config.port} is already in use. Stop the old server first.`
+      : error.message);
+  });
+  server.listen(config.port, config.host);
+
+  let stopping = false;
+  const shutdown = () => {
+    if (stopping) return;
+    stopping = true;
+    if (!server.listening) {
+      // Still starting up: nothing to drain, and closing now would race the listen.
+      process.exit(0);
+    }
+    // http.Server#close() would also drop sockets that were accepted but have
+    // not sent their request yet. Stop accepting at the net level instead,
+    // answer what is in flight with Connection: close, and only then close
+    // keep-alive sockets that are genuinely idle.
+    // The exit waits a moment after the last socket closes: a connection the
+    // supervisor handed over just before it saw this worker stop listening is
+    // still in transit, and must be refused (so it goes to another worker)
+    // rather than lost with the process.
+    server.draining = true;
+    net.Server.prototype.close.call(server, () => setTimeout(() => process.exit(0), HANDOFF_SETTLE_MS));
+    setTimeout(() => server.closeIdleConnections(), DRAIN_IDLE_MS).unref();
+    setTimeout(() => {
+      server.closeAllConnections();
+      process.exit(0);
+    }, SHUTDOWN_GRACE_MS).unref();
+  };
+
+  process.on('message', (message) => {
+    if (message?.type === 'shutdown') shutdown();
+  });
+  process.on('SIGTERM', shutdown);
+  // Ctrl+C reaches every process in the group; the supervisor decides what stops.
+  process.on('SIGINT', () => {});
+  // Stop taking connections, let in-flight requests finish, then exit so the
+  // supervisor starts a clean replacement.
+  process.on('uncaughtException', (error) => {
+    console.error(`${new Date().toISOString()} [worker ${process.pid}] uncaught error, replacing this worker: ${error.stack || error.message}`);
+    setTimeout(() => process.exit(1), SHUTDOWN_GRACE_MS).unref();
+    shutdown();
+  });
 }
 
 function main() {
@@ -437,44 +743,14 @@ function main() {
   try {
     config = readConfig(process.env);
   } catch (error) {
-    console.error(`Cannot start: ${error.message}`);
-    process.exit(1);
+    reportFatal(error.message);
+    return;
   }
-
-  const server = createStaticServer(config);
-  const scheme = config.tls ? 'https' : 'http';
-
-  server.on('error', (error) => {
-    const reason = error.code === 'EADDRINUSE'
-      ? `port ${config.port} is already in use. Stop the old server first.`
-      : error.message;
-    console.error(`Cannot start: ${reason}`);
-    process.exit(1);
-  });
-
-  server.listen(config.port, config.host, () => {
-    console.log(`${new Date().toISOString()} Serving ${config.root} on ${scheme}://${config.host}:${config.port}`);
-  });
-
-  let stopping = false;
-  const shutdown = (signal) => {
-    if (stopping) return;
-    stopping = true;
-    console.log(`${new Date().toISOString()} ${signal} received, shutting down`);
-    server.close(() => process.exit(0));
-    server.closeIdleConnections();
-    setTimeout(() => {
-      server.closeAllConnections();
-      process.exit(0);
-    }, SHUTDOWN_GRACE_MS).unref();
-  };
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
-
-  process.on('uncaughtException', (error) => {
-    console.error(`${new Date().toISOString()} Uncaught error, exiting:`, error);
-    process.exit(1);
-  });
+  if (cluster.isPrimary) {
+    runPrimary(config);
+  } else {
+    runWorker(config);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
