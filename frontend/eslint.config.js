@@ -32,4 +32,13 @@ export default defineConfig([
       }],
     },
   },
+  {
+    files: ['server.mjs', 'tests/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: globals.node,
+    },
+  },
 ])
