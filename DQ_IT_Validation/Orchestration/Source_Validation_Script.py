@@ -1,6 +1,4 @@
 import oracledb
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
 from datetime import datetime
 import pytz
 import json
@@ -40,7 +38,7 @@ def log_detailed_error(context: str, error: Exception, additional_info: Dict = N
     print_safe(f"{'=' * 80}")
     print_safe(f"Error: {str(error)}")
     if additional_info:
-        print_safe(f"\nDetails:")
+        print_safe("\nDetails:")
         for key, value in additional_info.items():
             print_safe(f"  • {key}: {value}")
     print_safe(f"{'=' * 80}\n")
@@ -168,7 +166,7 @@ class ConfigLoader:
                         if transformations:
                             self.field_name_transformation_detected = True
                             self.transformation_rules = transformations
-                            print_safe(f"  🔍 Detected Field Mapper transformation:")
+                            print_safe("  🔍 Detected Field Mapper transformation:")
                             for pattern, replacement in transformations:
                                 repl_display = repr(replacement) if replacement else "''"
                                 print_safe(f"     • Pattern: {pattern} → Replacement: {repl_display}")
@@ -542,12 +540,12 @@ class OracleConnector:
 
     def ensure_connected(self) -> bool:
         if not self.is_alive():
-            print_safe(f"      ⚠️  Oracle connection lost, reconnecting...")
+            print_safe("      ⚠️  Oracle connection lost, reconnecting...")
             if self.reconnect():
-                print_safe(f"      ✓ Oracle reconnected successfully")
+                print_safe("      ✓ Oracle reconnected successfully")
                 return True
             else:
-                print_safe(f"      ✗ Oracle reconnection failed")
+                print_safe("      ✗ Oracle reconnection failed")
                 return False
         return True
 
@@ -1103,7 +1101,7 @@ class SourceDataCollector:
                 'status': 'TIMEOUT', 'error': error_msg,
                 'collection_time': timeout, 'Last_Checked': datetime.now(EASTERN).isoformat()
             }
-        except Exception as e:
+        except Exception:
             executor.shutdown(wait=True)
             raise
 
@@ -1113,7 +1111,7 @@ class SourceDataCollector:
         timeout_tables = []
 
         if self.format_type == 'query_based':
-            print_safe(f"\n  ⏳ Collecting source data for query-based pipeline...")
+            print_safe("\n  ⏳ Collecting source data for query-based pipeline...")
             result = self._collect_single_table_with_timeout("QUERY_RESULT", timeout=self.table_timeout)
             if result['status'] == 'TIMEOUT':
                 print_safe(f"    ⏱️  Collection timed out after {self.table_timeout}s")
@@ -1303,14 +1301,14 @@ def collect_single_pipeline_source(pipeline_data: Dict, config: Dict, pipeline_i
             elif isinstance(excluded_cols, str):
                 excluded_columns = [col.strip().upper() for col in excluded_cols.split(',') if col.strip()]
 
-        print_safe(f"  📊 Configuration:")
+        print_safe("  📊 Configuration:")
         print_safe(f"     Oracle Schema: {oracle_schema}")
         print_safe(f"     Snowflake Target: {sf_database}.{sf_schema}")
         print_safe(f"     Format: {format_type}")
         print_safe(f"     Tables: {len(tables) if tables else 'N/A (query-based)'}")
         print_safe(f"     Timeout: {table_timeout}s per table")
         if field_name_transformation:
-            print_safe(f"     Column Name Transformation: ENABLED")
+            print_safe("     Column Name Transformation: ENABLED")
 
         oracle_pool = ConnectionPool(
             OracleConnector,
@@ -1319,18 +1317,18 @@ def collect_single_pipeline_source(pipeline_data: Dict, config: Dict, pipeline_i
         )
 
         try:
-            print_safe(f"  🔌 Testing Oracle connection...")
+            print_safe("  🔌 Testing Oracle connection...")
             oracle_test = oracle_pool.get_connection()
             if not oracle_test:
                 return {'pipeline_name': pipeline_name, 'pipeline_number': pipeline_number,
                         'status': 'ERROR', 'error': 'Failed to establish Oracle connection', 'source_data': None}
             oracle_pool.return_connection(oracle_test)
-            print_safe(f"  ✅ Oracle connection established")
+            print_safe("  ✅ Oracle connection established")
 
             if format_type == 'table_list':
                 should_fetch_all_tables = (not tables and getattr(config_loader, 'table_pattern', '') == '%')
                 if should_fetch_all_tables:
-                    print_safe(f"  🔍 Fetching all tables from Oracle...")
+                    print_safe("  🔍 Fetching all tables from Oracle...")
                     oracle_conn = oracle_pool.get_connection()
                     tables = oracle_conn.get_all_tables()
                     oracle_pool.return_connection(oracle_conn)
@@ -1370,7 +1368,7 @@ def collect_single_pipeline_source(pipeline_data: Dict, config: Dict, pipeline_i
 
             collector.collect_all_tables()
             source_data = collector.get_results()
-            print_safe(f"  ✅ Pipeline source collection completed")
+            print_safe("  ✅ Pipeline source collection completed")
 
             return {
                 'pipeline_name': pipeline_name,
@@ -1394,13 +1392,13 @@ def collect_single_pipeline_source(pipeline_data: Dict, config: Dict, pipeline_i
             }
 
         finally:
-            print_safe(f"  🧹 Cleaning up Oracle connection pool...")
+            print_safe("  🧹 Cleaning up Oracle connection pool...")
             skip_disconnect = False
             try:
                 if 'collector' in locals() and hasattr(collector, 'has_abandoned_threads'):
                     skip_disconnect = collector.has_abandoned_threads
                     if skip_disconnect:
-                        print_safe(f"  ⚠️  Abandoned threads detected - skipping disconnect")
+                        print_safe("  ⚠️  Abandoned threads detected - skipping disconnect")
             except:
                 pass
             try:

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
+import json
 import hmac
 import re
 import logging
@@ -12,6 +14,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 from fastapi import Depends, Header, HTTPException
+
+import assistant.env  # noqa: F401  loads backend/.env before AZURE_TENANT_ID is read
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +36,16 @@ _graph_session.mount(
 # token itself) for a short window.
 TOKEN_CACHE_TTL_SECONDS = 300
 GRAPH_TIMEOUT_SECONDS = 10
+
+# Graph accepts a token from any Entra tenant, and another tenant's admin
+# controls what /me says a user's mail is. Without this pin, a foreign
+# tenant could sign in as any address that holds a role here.
+# Comma separated, so a second tenant can be allowed on purpose.
+ALLOWED_TENANTS = frozenset(
+    t.strip().lower() for t in (os.environ.get("AZURE_TENANT_ID") or "").split(",") if t.strip()
+)
+if not ALLOWED_TENANTS:
+    logger.error("AZURE_TENANT_ID is not set - every sign-in will be refused until it is")
 
 _token_cache: Dict[str, Tuple[float, dict]] = {}
 _token_cache_lock = threading.Lock()
@@ -334,8 +348,40 @@ def _extract_bearer(authorization: Optional[str]) -> str:
     return parts[1]
 
 
+def _token_tenant(token: str) -> Optional[str]:
+    """The tid claim, read without checking the signature: only called after
+    Graph has accepted the token, which is the signature check."""
+    try:
+        payload = token.split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+        tid = claims.get("tid")
+        return tid.lower() if isinstance(tid, str) else None
+    except (IndexError, ValueError, AttributeError):
+        return None
+
+
+def _graph_tenant(token: str) -> Optional[str]:
+    """Fallback when the token isn't a readable JWT: ask Graph which
+    organization the signed-in user belongs to."""
+    try:
+        r = _graph_session.get(
+            f"{GRAPH_API_ENDPOINT}/organization?$select=id",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=GRAPH_TIMEOUT_SECONDS,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Graph tenant lookup unreachable: {type(e).__name__}")
+        raise HTTPException(status_code=503, detail="Identity provider unavailable")
+    if r.status_code != 200:
+        return None
+    orgs = r.json().get("value") or []
+    return str(orgs[0].get("id", "")).lower() if orgs else None
+
+
 def _validate_token_with_graph(token: str) -> dict:
     """Blocking. Call via asyncio.to_thread from async code."""
+    if not ALLOWED_TENANTS:
+        raise HTTPException(status_code=503, detail="Sign-in is not configured on the server (AZURE_TENANT_ID)")
     try:
         response = _graph_session.get(
             f"{GRAPH_API_ENDPOINT}/me",
@@ -348,6 +394,11 @@ def _validate_token_with_graph(token: str) -> dict:
 
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    tenant = _token_tenant(token) or _graph_tenant(token)
+    if tenant not in ALLOWED_TENANTS:
+        logger.warning(f"401 - token from tenant {tenant or 'unknown'} is not allowed")
+        raise HTTPException(status_code=401, detail="This account's organization is not allowed")
 
     data = response.json()
     return {

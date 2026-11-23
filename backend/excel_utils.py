@@ -82,7 +82,6 @@ def apply_excel_type_formatting(buf: io.BytesIO) -> bytes:
             # Build sets of 1-based column indices
             date_cols    = {i + 1 for i, h in enumerate(headers) if _is_date_col(h)}
             text_only    = {i + 1 for i, h in enumerate(headers) if _is_text_only(h)}
-            numeric_cols = set()  # populated on first pass below
 
             # ── Date pass ─────────────────────────────────────────────────
             date_converted = 0

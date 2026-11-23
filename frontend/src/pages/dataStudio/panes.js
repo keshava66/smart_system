@@ -1,8 +1,12 @@
-import SnowflakePane, { PostgresPane } from './sf_pg/sf_pg_pane';
-import S3Pane from './s3/S3Pane';
-import IndexHealth from './indexer';
-import StreamsetsPane from './streamsets/StreamsetsPane';
-import DataShuttle from './DataShuttle';
+import { lazyPage } from '../../utils/lazyPage';
+
+// Each pane is its own file, fetched the first time its tab opens.
+const SnowflakePane = lazyPage(() => import('./sf_pg/sf_pg_pane'));
+const PostgresPane = lazyPage(() => import('./sf_pg/sf_pg_pane').then((m) => ({ default: m.PostgresPane })));
+const IndexHealth = lazyPage(() => import('./indexer'));
+const S3Pane = lazyPage(() => import('./s3/S3Pane'));
+const StreamsetsPane = lazyPage(() => import('./streamsets/StreamsetsPane'));
+const DataShuttle = lazyPage(() => import('./DataShuttle'));
 
 import sfIcon from "/icons/snowflake_badge.svg";
 import s3Icon from "/icons/s3_badge.svg";

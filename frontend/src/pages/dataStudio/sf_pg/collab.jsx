@@ -559,7 +559,7 @@ const CSS = `
 .sf-peer-flag { animation: sf-peer-flag 2600ms ease-out forwards; }
 @keyframes sf-peer-flash { 0%, 45% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes sf-peer-flag { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .sf-peer-caret { transition: none; } }
+html.reduce-motion .sf-peer-caret { transition: none; }
 `;
 if (typeof document !== 'undefined' && !document.getElementById('sf-peer-css')) {
   const el = document.createElement('style');

@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { request, usePage, useToast } from './lib';
 import {
-  BuildPane, Confirm, ConfirmBuild, DIAG, DiagPane, I, ResultsPane, ResultsSkeleton, Rail, Spin, Sql, UsagePane, UsageSkeleton,
-  ago, compact, plural, scoreOf, titleOf, usageLists,
+  BuildPane, Confirm, ConfirmBuild, DiagPane, I, ResultsPane, ResultsSkeleton, Rail, Spin, Sql, UsagePane, UsageSkeleton,
 } from '../dataStudio/indexer';
+import { DIAG, ago, compact, plural, scoreOf, titleOf, usageLists } from '../dataStudio/indexerLib';
 import '../dataStudio/indexer.css';
 
 /* Index Health inside the export page. Same components and look as Data Studio's

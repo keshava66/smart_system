@@ -16,7 +16,7 @@ import { PeerLayer, SharedSession, usePeers } from './collab';
 import { useInPageLog } from '../useInPageLog';
 import { useRBAC } from '../../../context/RBACContext';
 import { useMsal } from '@azure/msal-react';
-import { graphToken, searchDirectory } from '../../components/CommunicationParts';
+import { graphToken, searchDirectory } from '../../components/communicationLib';
 import { useDirectoryPhotos } from '../../../hooks/useDirectoryPhotos';
 import {
   caretPixelPos, cellText, clauseAtCaret, DEFAULT_COL_WIDTH, EXPORT_FORMATS, fetchJson,
@@ -524,7 +524,9 @@ const DS_CSS = `
 .ds-root *:hover, .ds-pop *:hover { scrollbar-color: #a39992 transparent }
 .ds-root .ds-dark, .ds-root .ds-dark * { scrollbar-color: #4a423e transparent }
 .ds-root .ds-dark:hover, .ds-root .ds-dark *:hover { scrollbar-color: #6e6259 transparent }
-@media (prefers-reduced-motion: reduce) { .ds-scan { display: none } .ds-in, .ds-count, .ds-live::after, .ds-sfbar { animation: none } .ds-run { animation: none; width: 100%; opacity: .55 } }
+html.reduce-motion .ds-scan { display: none }
+html.reduce-motion .ds-in, html.reduce-motion .ds-count, html.reduce-motion .ds-live::after, html.reduce-motion .ds-sfbar { animation: none }
+html.reduce-motion .ds-run { animation: none; width: 100%; opacity: .55 }
 `;
 if (typeof document !== 'undefined' && !document.getElementById('ds-css')) {
   const el = document.createElement('style');
@@ -1788,7 +1790,7 @@ function SfExplorer({
     fetchJson(withQs(`${E.api}/databases${bypass ? '?bypass_cache=true' : ''}`, cq))
       .then(data => setDatabases(data.databases || []))
       .catch(err => setDbError(err));
-  }, []);
+  }, [E.api, E.id, cq]);
 
   useEffect(() => { loadDatabases(); }, [loadDatabases]);
 
@@ -1802,11 +1804,11 @@ function SfExplorer({
       .catch(err => { store[key] = err; rerender(); });
   }, [rerender]);
 
-  const loadSchemas = useCallback((db, force) => load('schemas', db, withQs(`${E.api}/schemas?database=${enc(db)}`, cq), d => d.schemas || [], force), [load]);
+  const loadSchemas = useCallback((db, force) => load('schemas', db, withQs(`${E.api}/schemas?database=${enc(db)}`, cq), d => d.schemas || [], force), [load, E.api, cq]);
   const loadTables = useCallback((db, schema, force) => load('tables', `${db}.${schema}`,
-    withQs(`${E.api}/tables?database=${enc(db)}&schema=${enc(schema)}`, cq), d => d.tables || [], force), [load]);
+    withQs(`${E.api}/tables?database=${enc(db)}&schema=${enc(schema)}`, cq), d => d.tables || [], force), [load, E.api, cq]);
   const loadColumns = useCallback((db, schema, table, force) => load('columns', `${db}.${schema}.${table}`,
-    withQs(`${E.api}/columns?database=${enc(db)}&schema=${enc(schema)}&table=${enc(table)}`, cq), d => d.columns || [], force), [load]);
+    withQs(`${E.api}/columns?database=${enc(db)}&schema=${enc(schema)}&table=${enc(table)}`, cq), d => d.columns || [], force), [load, E.api, cq]);
 
   const toggle = (key, onOpen) => {
     setOpen(prev => {
@@ -1873,7 +1875,7 @@ function SfExplorer({
   useEffect(() => {
     if (!canFind) return;
     fetchJson(withQs(`${E.api}/search-tables/warm`, cq), { method: 'POST' }).catch(() => {});
-  }, [canFind, cq]);
+  }, [canFind, cq, E.api]);
 
   useEffect(() => {
     if (!findOn) { setFound(null); setFindErr(null); setFindBusy(false); return; }
@@ -1911,7 +1913,7 @@ function SfExplorer({
         });
     }, 150);
     return () => { clearTimeout(t); ctrl.abort(); };
-  }, [q, findOn, cq]);
+  }, [q, findOn, cq, E.api]);
 
   // refresh button should also drop cached search results
   useEffect(() => { findCache.current.clear(); lastFound.current = { q: '', data: null }; }, [databases]);
@@ -3702,7 +3704,7 @@ const SfEditor = forwardRef(function SfEditor({ value, onChange: setValue, histo
       return;
     }
     req.then(settle).catch(() => settle([]));
-  }, []);
+  }, [E.api, cq]);
 
   const columnsInScope = useCallback((refs) => {
     const out = [];
@@ -4373,7 +4375,7 @@ function StudioPane({ active: paneActive = true }) {
         setConnError(err.message);
         setConnState(err.status === 503 && err.body?.detail ? 'unconfigured' : 'error');
       });
-  }, []);
+  }, [E.api]);
   useEffect(() => { checkConnection(); }, [checkConnection]);
 
   /* ------------------------------ worksheets ------------------------------ */
@@ -4417,7 +4419,7 @@ function StudioPane({ active: paneActive = true }) {
   useEffect(() => {
     writeLocal(LS.tabs, JSON.stringify(tabs.filter(t => t.kind === 'query')));
     writeLocal(LS.activeTab, active.id);
-  }, [tabs, active.id]);
+  }, [tabs, active.id, LS]);
 
   const writeUrl = useCallback((tab, push = false) => {
     setParams(prev => {
@@ -4865,13 +4867,13 @@ function StudioPane({ active: paneActive = true }) {
     fetchJson(`${E.api}/history?limit=50`)
       .then(data => setHistory({ status: 'ready', items: data.history || [], error: null }))
       .catch(err => setHistory(h => ({ ...h, status: 'error', error: err.message })));
-  }, []);
+  }, [E.api]);
   const loadSaved = useCallback(() => {
     setSaved(s => ({ ...s, status: 'loading', error: null }));
     fetchJson(`${E.api}/saved`)
       .then(data => setSaved({ status: 'ready', items: data.saved || [], error: null }))
       .catch(err => setSaved(s => ({ ...s, status: 'error', error: err.message })));
-  }, []);
+  }, [E.api]);
 
   useEffect(() => {
     if (connState !== 'ready') return;
@@ -4943,7 +4945,7 @@ function StudioPane({ active: paneActive = true }) {
       patchView(tabId, { loading: false });
       toast(err.message || 'Could not load that page of rows', 'error');
     }
-  }, [patchView, toast]);
+  }, [patchView, toast, E.api]);
 
   // Set when a save in result-edit mode re-runs the query, so editing turns
   // straight back on once the fresh rows land.
@@ -4992,7 +4994,7 @@ function StudioPane({ active: paneActive = true }) {
         patchView(tabId, { status: 'failed', error: gone ? 'The query result expired on the server. Run it again.' : err.message || 'Lost the connection while checking on the query' });
       }
     }, misses ? Math.min(8000, 400 * 2 ** misses) : 0);
-  }, [applyFinished, patchView]);
+  }, [applyFinished, patchView, E.api]);
 
   const submitQuery = async (tabId, sql, confirm) => {
     const seq = runSeqRef.current[tabId];
@@ -5352,7 +5354,7 @@ function StudioPane({ active: paneActive = true }) {
       if (seq !== tablePageSeq.current[tabId]) return;
       patchView(tabId, { error: err.message || 'Could not read the table', loading: false, status: 'failed' });
     }
-  }, [patchView]);
+  }, [patchView, E.api]);
 
   const openDataEditor = (database, schema, tableName, { fromUrl = false } = {}) => {
     const existing = tabs.find(t => sameTable(t, database, schema, tableName));

@@ -1035,7 +1035,7 @@ def _row_hash(row: dict, columns: List[str]) -> str:
     """Order-stable hash of a row across a fixed column list, used to compare
     rows when there's no key column to join on."""
     parts = [_norm_val(row.get(c)) for c in columns]
-    return hashlib.md5("\x1f".join(parts).encode("utf-8", errors="replace")).hexdigest()
+    return hashlib.md5("\x1f".join(parts).encode("utf-8", errors="replace"), usedforsecurity=False).hexdigest()
 
 
 def _full_row_diff(src_rows: List[dict], tgt_rows: List[dict], columns: List[str]) -> "tuple[dict, dict]":

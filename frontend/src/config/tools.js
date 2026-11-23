@@ -124,7 +124,7 @@ export const TOOL_CATALOG = [
     description: 'Explore unstructured document sets - Virtual Regulator, IMMBOT, RIMDocs, EPOD, FDA and more - with filterable tables and charts.',
     icon: unstructuredIcon, badge: null, path: '/unstructured-explorer',
     permission: 'viewUnstructured', colorKey: 'orange', category: 'Explorers',
-    // Same order and permissions as the doctype tabs (UNSTRUCTURED_TABS in RBACContext).
+    // Same order and permissions as the doctype tabs (UNSTRUCTURED_TABS in config/permissions.js).
     sections: [
       { label: 'Virtual Regulator', path: '/unstructured-explorer?doctype=vr',        permission: 'viewUnstructuredVR' },
       { label: 'IMMBOT',            path: '/unstructured-explorer?doctype=immbot',    permission: 'viewUnstructuredIMMBOT' },

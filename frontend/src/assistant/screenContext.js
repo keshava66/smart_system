@@ -17,7 +17,7 @@ const listeners = new Set();
 export function publishScreen(snapshot) {
   current = snapshot ? { ...snapshot, at: Date.now() } : null;
   currentRoute = snapshot ? window.location.pathname : null;
-  listeners.forEach((fn) => { try { fn(current); } catch {} });
+  listeners.forEach((fn) => { try { fn(current); } catch { /* one bad listener must not block the rest */ } });
 }
 
 export function clearScreen() {

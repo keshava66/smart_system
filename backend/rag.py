@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import urlparse
 
 import requests
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 

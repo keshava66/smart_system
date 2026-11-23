@@ -26,6 +26,10 @@ export default defineConfig([
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Context modules export their provider plus the hook that reads it.
+      'react-refresh/only-export-components': ['error', {
+        allowExportNames: ['useAuth', 'useRBAC', 'useAssistantSettings', 'useSessionTimeout'],
+      }],
     },
   },
 ])

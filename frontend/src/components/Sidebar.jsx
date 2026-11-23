@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAssistantSettings } from "../context/AssistantSettingsContext";
 import { useProfilePhoto } from "../hooks/useProfilePhoto";
 import { TOOL_CATALOG, dashboardRank } from "../config/tools";
+import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
 
 import logoutIcon from "/icons/JJ_Icon_Log_Out_RGB.svg";
 import chevronDown from "/icons/JJ_Icon_Chevron_Down.svg";
@@ -26,6 +27,10 @@ import infoIcon from "/icons/JJ_Icon_Info_RGB.svg";
 import evidenceFlowIcon from "/icons/JJ_Icon_AI_RGB.svg";
 import logoFull from "/sh_logo.png";
 import logoMark from "/sh_logo_small_black.svg";
+import closeIcon from "/icons/JJ_Icon_Close.svg";
+import { saveReducedMotion, useReducedMotion } from '../utils/motion';
+import ShortcutsDialog from './ShortcutsDialog';
+import SignOutDialog from './SignOutDialog';
 
 const OPEN_W = 280;
 const SHUT_W = 76;
@@ -38,32 +43,32 @@ const HEAD_CENTER = 25;
 // Order inside a group follows the dashboard (NEW first).
 const MENU_GROUPS = [
   ["Workspace", [
-    { id: "dashboard",             label: "Dashboard",             icon: dashboardIcon,      path: "/dashboard",             permission: "viewDashboard" },
-    { id: "dqe",                   label: "Data quality",          icon: dqIcon,             path: "/dqe",                   permission: "viewDQE" },
-    { id: "pipeline-studio",       label: "Pipeline Studio",       icon: pipelineIcon,       path: "/pipeline-studio",       permission: "runStreamsetsExtractor" },
-    { id: "ingestion-lab",  label: "Ingestion Lab",  icon: validationIcon,     path: "/ingestion-lab",  permission: "viewIngestionLab" },
-    { id: "fuzzy-match",           label: "Fuzzy match",           icon: searchIcon,         path: "/fuzzy-match",           permission: "viewFuzzyMatch" },
-    { id: "evidenceflow",          label: "EvidenceFlow",          icon: evidenceFlowIcon,   path: "/evidenceflow",          permission: "viewEvidenceFlow" },
+    { id: "dashboard",             label: "Dashboard",             icon: dashboardIcon,      path: "/dashboard", hint: "Your tools and recent activity in one place",             permission: "viewDashboard" },
+    { id: "dqe",                   label: "Data quality",          icon: dqIcon,             path: "/dqe", hint: "Quality checks and validation across your data",                   permission: "viewDQE" },
+    { id: "pipeline-studio",       label: "Pipeline Studio",       icon: pipelineIcon,       path: "/pipeline-studio", hint: "Open, extract and validate StreamSets pipelines",       permission: "runStreamsetsExtractor" },
+    { id: "ingestion-lab",  label: "Ingestion Lab",  icon: validationIcon,     path: "/ingestion-lab", hint: "Run ingestion steps and watch them live",  permission: "viewIngestionLab" },
+    { id: "fuzzy-match",           label: "Fuzzy match",           icon: searchIcon,         path: "/fuzzy-match", hint: "Search every Denodo view for a value",           permission: "viewFuzzyMatch" },
+    { id: "evidenceflow",          label: "EvidenceFlow",          icon: evidenceFlowIcon,   path: "/evidenceflow", hint: "Pull evidence from PBRER and DSUR PDFs",          permission: "viewEvidenceFlow" },
   ]],
   ["Explorers", [
-    { id: "unstructured-explorer", label: "Unstructured Explorer", icon: unstructuredIcon,   path: "/unstructured-explorer", permission: "viewUnstructured" },
-    { id: "gra-data-domains",      label: "Structured Explorer",   icon: graDomainsIcon,     path: "/gra-data-domains",      permission: "viewGraDataDomains" },
-    { id: "data-studio",           label: "Data Studio",           icon: dataStudioIcon,     path: "/data-studio",           permission: "viewDataStudio" },
-    { id: "data-api",              label: "Data API Export",       icon: dataApiIcon,        path: "/data-api",              permission: "manageDataAPIExports" },
+    { id: "unstructured-explorer", label: "Unstructured Explorer", icon: unstructuredIcon,   path: "/unstructured-explorer", hint: "Browse document sets with filters and charts", permission: "viewUnstructured" },
+    { id: "gra-data-domains",      label: "Structured Explorer",   icon: graDomainsIcon,     path: "/gra-data-domains", hint: "GRA data domains, sponsors and owners",      permission: "viewGraDataDomains" },
+    { id: "data-studio",           label: "Data Studio",           icon: dataStudioIcon,     path: "/data-studio", hint: "SQL, live tables, S3 and pipeline reports",           permission: "viewDataStudio" },
+    { id: "data-api",              label: "Data API Export",       icon: dataApiIcon,        path: "/data-api", hint: "Publish tables as read-only APIs",              permission: "manageDataAPIExports" },
   ]],
   ["Intelligence", [
-    { id: "rag",                   label: "RAGs",                  icon: aiIcon,             path: "/rag",                   permission: "viewRAG" },
-    { id: "ai-assistant",          label: "AI assistant",          icon: aiIcon,             path: "/ai-assistant",          permission: "viewAIChatbot" },
+    { id: "rag",                   label: "RAGs",                  icon: aiIcon,             path: "/rag", hint: "AI answers from your document repositories",                   permission: "viewRAG" },
+    { id: "ai-assistant",          label: "AI assistant",          icon: aiIcon,             path: "/ai-assistant", hint: "Ask questions about your data",          permission: "viewAIChatbot" },
   ]],
   ["Admin", [
-    { id: "user-management",       label: "User Management",       icon: userManagementIcon, path: "/user-management",       permission: "viewUserManagement" },
-    { id: "communication-center",  label: "Communication Center",  icon: commsIcon,          path: "/communication-center",  permission: "sendCommunications" },
-    { id: "audit",                 label: "Audit Log",             icon: auditIcon,          path: "/audit",                 permission: "viewAudit" },
+    { id: "user-management",       label: "User Management",       icon: userManagementIcon, path: "/user-management", hint: "Roles, permissions and AD group access",       permission: "viewUserManagement" },
+    { id: "communication-center",  label: "Communication Center",  icon: commsIcon,          path: "/communication-center", hint: "Email updates and notices to portal users",  permission: "sendCommunications" },
+    { id: "audit",                 label: "Audit Log",             icon: auditIcon,          path: "/audit", hint: "Who's signed in, and every action on record",                 permission: "viewAudit" },
   ]],
 ];
 
 // Pinned under the tool groups for everyone, whatever their role.
-const ABOUT = { id: "about", label: "About us", icon: infoIcon, path: "/about", subs: [] };
+const ABOUT = { id: "about", label: "About us", icon: infoIcon, path: "/about", hint: "The team behind GRA SmartHub", subs: [] };
 
 const catalogFor = (path) => TOOL_CATALOG.find((t) => t.path === path);
 
@@ -114,7 +119,7 @@ const CSS = `
   -webkit-mask:var(--icon) center/contain no-repeat; mask:var(--icon) center/contain no-repeat; }
 
 .sb-panel { position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; background:#fdfcfb;
-  border-right:1px solid #d9d1ca; box-shadow:inset -1px 0 0 #fff, 1px 0 0 rgba(255,255,255,.9), 18px 0 36px -26px rgba(60,30,20,.3); }
+  border-right:1px solid #d5cfc9; }
 
 .sb-brand { position:relative; z-index:1; display:flex; align-items:center; height:60px; flex-shrink:0; padding:0 16px 0 24px; background:#fdfcfb; /* left edge lines up with the menu below */
   border-bottom:1px solid #efeae6; transition:box-shadow .2s; }
@@ -147,8 +152,6 @@ const CSS = `
 .sb-link.on:hover, .sb-link.on.flying { background:#d41500; color:#fff; box-shadow:0 12px 24px -10px rgba(235,23,0,.7); }
 .sb-link.on > .sb-ic { color:#fff; }
 .sb-lbl { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
-.sb-new { font-size:9.5px; font-weight:500; letter-spacing:.1em; padding:3px 6px; border-radius:6px; background:#fde8e4; color:#c81400; }
-.sb-link.on .sb-new { background:rgba(255,255,255,.22); color:#fff; }
 .sb-link > .sb-chev { width:10px; height:10px; margin-right:2px; transform:rotate(-90deg); }
 
 .sb-skel { display:flex; align-items:center; gap:12px; height:40px; padding:0 12px; }
@@ -176,13 +179,18 @@ const CSS = `
 .sb-ubtn > .sb-chev { width:12px; height:12px; margin-right:6px; color:#7a726c; transition:transform .3s var(--ease); }
 .sb-ubtn.on > .sb-chev { transform:rotate(180deg); }
 
-.sb-menu { position:absolute; left:14px; bottom:72px; width:248px; z-index:20; overflow:hidden; background:#fff; border:1px solid #ebe5df; border-radius:16px;
+.sb-menu { position:absolute; left:14px; bottom:72px; width:min(300px, calc(100vw - 28px)); z-index:20; overflow:hidden; background:#fff; border:1px solid #ebe5df; border-radius:16px;
   box-shadow:0 28px 56px -20px rgba(40,20,10,.3); animation:sbUp .25s var(--ease) both; }
 .sb-menu-head { display:flex; flex-direction:column; gap:2px; padding:14px 16px; background:#faf8f6; border-bottom:1px solid #efeae6; }
 .sb-menu-head span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sb-menu-head span:first-child { font-size:14px; font-weight:500; }
-.sb-menu-head span:last-child { font-size:12px; color:#7a726c; }
-.sb-menu-row { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #efeae6; }
+.sb-menu-head .sb-menu-name { font-size:14px; font-weight:500; white-space:normal; overflow-wrap:anywhere; }
+.sb-menu-head em { align-self:flex-start; margin-top:6px; padding:2px 8px; border-radius:6px; background:#fde8e4; color:#c81400; font-style:normal; font-size:11px; }
+.sb-menu-lbl { margin:0; padding:12px 16px 2px; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#7a726c; }
+.sb-menu-head .sb-menu-mail { font-size:11.5px; color:#7a726c; }
+.sb-menu-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; }
+.sb-menu-links { margin-top:4px; padding:4px 0; border-top:1px solid #efeae6; }
+.sb-menu-links button { display:block; width:100%; padding:9px 16px; border:0; background:none; text-align:left; font:inherit; font-size:13.5px; color:#1f1b18; cursor:pointer; transition:background-color .2s; }
+.sb-menu-links button:hover, .sb-menu-links button:focus-visible { background:#f6f2ee; }
 .sb-menu-row div { display:flex; flex-direction:column; gap:2px; }
 .sb-menu-row div span:first-child { font-size:13.5px; }
 .sb-menu-row div span:last-child { font-size:12px; color:#7a726c; }
@@ -190,7 +198,7 @@ const CSS = `
 .sb-switch.on { background:#eb1700; }
 .sb-switch span { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .3s var(--spring); }
 .sb-switch.on span { transform:translateX(20px); }
-.sb-out { width:100%; display:flex; align-items:center; gap:10px; padding:13px 16px; border:0; background:#fff; cursor:pointer; text-align:left;
+.sb-out { width:100%; display:flex; align-items:center; gap:10px; margin-top:8px; padding:13px 16px; border:0; border-top:1px solid #efeae6; background:#fff; cursor:pointer; text-align:left;
   font:inherit; font-size:13.5px; color:#eb1700; transition:background-color .2s; }
 .sb-out:hover { background:#fdf2f0; }
 .sb-out .sb-ic { width:16px; height:16px; }
@@ -203,9 +211,20 @@ const CSS = `
 .sb.open .sb-toggle .sb-ic { transform:none; }
 
 .sb-fly { position:absolute; top:0; left:100%; z-index:40; padding-left:10px; animation:sbPop .22s var(--ease) both; }
-.sb-fly-card { position:relative; min-width:200px; padding:6px; background:rgba(31,27,24,.74); border:1px solid rgba(255,255,255,.08); border-radius:14px;
+.sb-fly-card { position:relative; width:max-content; max-width:250px; padding:6px; background:rgba(31,27,24,.74); border:1px solid rgba(255,255,255,.08); border-radius:14px;
   -webkit-backdrop-filter:blur(18px) saturate(1.5); backdrop-filter:blur(18px) saturate(1.5);
   box-shadow:0 22px 44px -16px rgba(20,10,5,.55); }
+.sb-fly-card.has-subs { min-width:200px; }
+/* the description is a second, smaller tooltip beside the card; it shows
+   only while the pointer rests on the page name (or it has keyboard focus);
+   moving to a sub-page or away hides it.
+   It sits outside the card so its own blur isn't cut off by the card's. */
+.sb-fly-hint { position:absolute; left:calc(100% + 8px); top:6px; width:max-content; max-width:240px; margin:0; padding:7px 10px;
+  border-radius:10px; background:rgba(31,27,24,.74); border:1px solid rgba(255,255,255,.08);
+  -webkit-backdrop-filter:blur(18px) saturate(1.5); backdrop-filter:blur(18px) saturate(1.5); box-shadow:0 14px 30px -14px rgba(20,10,5,.5);
+  font-size:12px; line-height:1.4; color:#e6ded7; white-space:normal; text-wrap:pretty; pointer-events:none;
+  opacity:0; visibility:hidden; translate:-4px 0; transition:opacity .18s, translate .18s var(--ease), visibility 0s linear .18s; }
+.sb-fly-card:has(.sb-fly-head:hover) ~ .sb-fly-hint, .sb-fly-card:has(.sb-fly-head:focus-visible) ~ .sb-fly-hint { opacity:1; visibility:visible; translate:0 0; transition-delay:.35s; }
 .sb-fly-arrow { position:absolute; left:-6px; top:var(--arrow, 20px); width:10px; height:10px; background:rgba(31,27,24,.74);
   border-left:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08); clip-path:polygon(0 0, 0 100%, 100% 100%); transform:rotate(45deg); }
 .sb-fly-head, .sb-fly-sub { position:relative; display:flex; align-items:center; border-radius:9px; white-space:nowrap;
@@ -218,25 +237,46 @@ const CSS = `
 .sb-fly-sub.on { color:#fff; font-weight:500; }
 .sb-fly-sub i { display:block; flex-shrink:0; width:6px; height:6px; border-radius:50%; }
 .sb-fly-sub.on i { background:#eb1700; }
-.sb-fly-new { font-size:9px; font-weight:500; letter-spacing:.1em; padding:2px 5px; border-radius:5px; background:#eb1700; color:#fff; }
 .sb-fly-hr { height:1px; margin:4px 6px; background:rgba(255,255,255,.1); }
 
+.sb-scrim { display:none; }
+
+/* Phones and tablets: an off-canvas drawer with full labels, opened from the top bar. */
+.sb.mobile { position:fixed; top:0; bottom:0; left:0; width:min(${OPEN_W}px, 86vw); height:100dvh; z-index:60;
+  transform:translateX(-100%); transition:transform .32s var(--ease), visibility 0s linear .32s; visibility:hidden; }
+.sb.mobile.drawer { transform:none; visibility:visible; transition:transform .32s var(--ease); }
+.sb.mobile .sb-panel { box-shadow:24px 0 48px -16px rgba(40,20,10,.35); }
+.sb.mobile .sb-link { height:44px; }
+.sb.mobile .sb-about .sb-link { height:40px; }
+/* No popouts in the drawer, so no chevron promising one. */
+.sb.mobile .sb-link > .sb-chev { display:none; }
+.sb-scrim.on { display:block; position:fixed; inset:0; z-index:55; background:rgba(31,27,24,.42); animation:sbFade .2s ease both; }
+.sb-close { margin-left:auto; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:0; border-radius:10px;
+  background:transparent; color:#4a433e; cursor:pointer; }
+.sb-close:hover { background:#f1ebe6; }
+.sb-close .sb-ic { width:14px; height:14px; }
+
+@keyframes sbFade { from { opacity:0; } to { opacity:1; } }
 @keyframes sbPop { from { opacity:0; transform:translateX(-6px) scale(.98); } to { opacity:1; transform:none; } }
 @keyframes sbUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 @keyframes sbOut { 0% { opacity:0; transform:translateX(-18px) scale(.7); } 60% { opacity:1; transform:translateX(3px) scale(1.04); } 100% { opacity:1; transform:none; } }
 @keyframes sbBreath { 50% { opacity:.45; } }
 
-@media (prefers-reduced-motion: reduce) {
-  .sb, .sb *, .sb *::before, .sb *::after { animation-duration:.01ms !important; animation-delay:0ms !important; transition-duration:.01ms !important; }
-}
+html.reduce-motion .sb, html.reduce-motion .sb *, html.reduce-motion .sb *::before, html.reduce-motion .sb *::after { animation-duration:.01ms !important; animation-delay:0ms !important; transition-duration:.01ms !important; }
 `;
 
 // `expanded` is optional: the dashboard passes it (its header owns the toggle);
 // every other page lets the sidebar keep its own state.
-const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
+// On narrow screens the sidebar is a drawer: `drawerOpen` shows it and
+// `onDrawerClose` is called for the scrim, Escape, the close button and navigation.
+const Sidebar = ({ showUserMenu = false, showLogo = true, expanded, drawerOpen = false, onDrawerClose }) => {
+  const mobile = useMediaQuery(NARROW);
   const navigate = useNavigate();
   const location = useLocation();
-  const { hasPermission, loading: rbacLoading } = useRBAC();
+  const { hasPermission, loading: rbacLoading, roleDefinition } = useRBAC();
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
   const { logout, user } = useAuth();
   const { enabled: assistantEnabled, setEnabled: setAssistantEnabled } = useAssistantSettings();
   const { profilePhoto } = useProfilePhoto(user, logout);
@@ -245,7 +285,7 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
   const currentPath = location.pathname.split("/")[1] || "dashboard";
   const controlled = expanded !== undefined;
   const [ownOpen, setOwnOpen] = useState(currentPath === "dashboard");
-  const open = controlled ? expanded : ownOpen;
+  const open = mobile || (controlled ? expanded : ownOpen);
 
   const [userOpen, setUserOpen] = useState(false);
   const [fly, setFly] = useState(null);
@@ -314,23 +354,35 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
   // [ toggles, Escape dismisses.
   useEffect(() => {
     const onKey = (e) => {
+      // Esc inside a dialog (sign-out, shortcuts) closes only that dialog
+      if (e.target.closest?.("dialog")) return;
       if (e.key === "Escape") {
         closeFly();
         setUserOpen(false);
+        if (mobile) onDrawerClose?.();
         return;
       }
       if (e.ctrlKey || e.metaKey) return;
-      if (e.key === "[" && !e.altKey && !controlled && !isTyping()) {
+      if (e.key === "[" && !e.altKey && !controlled && !mobile && !isTyping()) {
         toggle();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [controlled, toggle, closeFly]);
+  }, [controlled, toggle, closeFly, mobile, onDrawerClose]);
+
+  // A hidden drawer must not keep focus or popouts.
+  useEffect(() => {
+    if (!mobile || drawerOpen) return;
+    closeFly();
+    setUserOpen(false);
+    if (asideRef.current?.contains(document.activeElement)) document.activeElement.blur();
+  }, [mobile, drawerOpen, closeFly]);
 
   useEffect(() => {
     if (!userOpen) return undefined;
     const onDown = (e) => {
+      if (e.target.closest?.("dialog")) return; // the sign-out question keeps the menu behind it
       if (!userRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setUserOpen(false);
     };
     document.addEventListener("mousedown", onDown);
@@ -346,7 +398,7 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
         .map((item) => {
           const cat = catalogFor(item.path);
           const subs = (cat?.sections || []).filter((s) => !s.permission || hasPermission(s.permission));
-          return { ...item, badge: cat?.badge === "NEW", subs };
+          return { ...item, subs };
         })])
       .filter(([, items]) => items.length > 0);
   }, [rbacLoading, hasPermission]);
@@ -370,6 +422,7 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
 
   const go = (path) => {
     closeFly();
+    if (mobile) onDrawerClose?.();
     navigate(path);
   };
 
@@ -382,6 +435,8 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
   // Collapsed: every row gets a popout. Expanded: only rows with sub pages do.
   const showFly = (target, item) => {
     cancelHide();
+    // No room beside a drawer; its sub pages are reached from the tool itself.
+    if (mobile) return;
     if (open && item.subs.length === 0) { setFly(null); return; }
     const a = asideRef.current.getBoundingClientRect();
     const r = target.getBoundingClientRect();
@@ -402,16 +457,31 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
   const email = user?.email || user?.username || "";
   const initials = initialsOf(name);
 
-  return (
-    <aside ref={asideRef} className={`sb${open ? " open" : ""}`} aria-label="Main navigation">
-      <style>{CSS}</style>
+  const cls = `sb${open ? " open" : ""}${mobile ? " mobile" : ""}${mobile && drawerOpen ? " drawer" : ""}`;
 
+  return (
+    <>
+    <style>{CSS}</style>
+    {mobile && <div className={`sb-scrim${drawerOpen ? " on" : ""}`} onClick={onDrawerClose} aria-hidden="true" />}
+    <aside
+      ref={asideRef}
+      id="main-navigation"
+      className={cls}
+      aria-label="Main navigation"
+      aria-hidden={mobile && !drawerOpen ? true : undefined}
+      inert={mobile && !drawerOpen ? true : undefined}
+    >
       <div className="sb-panel">
-        {showLogo && (
+        {(showLogo || mobile) && (
           <div className="sb-brand">
             {open
               ? <img src={logoFull} alt="GRA SmartHub" className="sb-logo-full" draggable={false} />
               : <img src={logoMark} alt="GRA SmartHub" className="sb-logo-mark" draggable={false} />}
+            {mobile && (
+              <button type="button" className="sb-close" onClick={onDrawerClose} aria-label="Close menu">
+                <Icon src={closeIcon} />
+              </button>
+            )}
           </div>
         )}
 
@@ -442,8 +512,8 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
                     className={`sb-link${on ? " on" : ""}${flying ? " flying" : ""}`}
                     aria-current={on ? "page" : undefined}
                     aria-label={open ? undefined : item.label}
-                    aria-haspopup={hasSubs ? "true" : undefined}
-                    aria-expanded={hasSubs ? flying : undefined}
+                    aria-haspopup={hasSubs && !mobile ? "true" : undefined}
+                    aria-expanded={hasSubs && !mobile ? flying : undefined}
                     onClick={(e) => onLinkClick(e, item.path)}
                     onMouseEnter={(e) => showFly(e.currentTarget, item)}
                     onMouseLeave={scheduleHide}
@@ -454,7 +524,6 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
                     {open && (
                       <>
                         <span className="sb-lbl">{item.label}</span>
-                        {item.badge && <span className="sb-new">NEW</span>}
                         {hasSubs && <Icon src={chevronDown} className="sb-chev" />}
                       </>
                     )}
@@ -483,7 +552,7 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
           </a>
         </div>
 
-        {showUserMenu && (
+        {(showUserMenu || mobile) && (
           <div className="sb-user" ref={userRef}>
             <button
               type="button"
@@ -508,7 +577,7 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
         )}
       </div>
 
-      {!controlled && (
+      {!controlled && !mobile && (
         <button
           type="button"
           className="sb-toggle"
@@ -521,23 +590,25 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
         </button>
       )}
 
-      {showUserMenu && userOpen && (
+      {(showUserMenu || mobile) && userOpen && (
         <div className="sb-menu" role="menu" ref={menuRef}>
           <div className="sb-menu-head">
-            <span>{name}</span>
-            <span>{email}</span>
+            <span className="sb-menu-name">{name}</span>
+            <span className="sb-menu-mail" title={email}>{email}</span>
+            {roleDefinition?.name && <em>{roleDefinition.name}</em>}
           </div>
+          <p className="sb-menu-lbl">Preferences</p>
           {canUseAssistant && (
             <div className="sb-menu-row">
               <div>
                 <span>AI assistant</span>
-                <span>{assistantEnabled ? "Enabled" : "Disabled"}</span>
+                <span>Floating helper on every page</span>
               </div>
               <button
                 type="button"
                 role="switch"
                 aria-checked={assistantEnabled}
-                aria-label="Toggle AI assistant"
+                aria-label="AI assistant"
                 className={`sb-switch${assistantEnabled ? " on" : ""}`}
                 onClick={() => setAssistantEnabled(!assistantEnabled)}
               >
@@ -545,12 +616,37 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
               </button>
             </div>
           )}
-          <button type="button" role="menuitem" className="sb-out" onClick={handleLogout}>
+          <div className="sb-menu-row">
+            <div>
+              <span>Reduce motion</span>
+              <span>Calmer pages, fewer animations</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={reduceMotion}
+              aria-label="Reduce motion"
+              className={`sb-switch${reduceMotion ? " on" : ""}`}
+              onClick={() => saveReducedMotion(!reduceMotion)}
+            >
+              <span />
+            </button>
+          </div>
+          <div className="sb-menu-links">
+            <button type="button" role="menuitem" onClick={() => { setUserOpen(false); setShortcutsOpen(true); }}>Keyboard shortcuts</button>
+            {hasPermission("sendCommunications") && (
+              <button type="button" role="menuitem" onClick={() => { setUserOpen(false); navigate("/communication-center?tab=whats-new"); }}>What&apos;s new</button>
+            )}
+          </div>
+          <button type="button" role="menuitem" className="sb-out" onClick={() => setSignOutOpen(true)}>
             <Icon src={logoutIcon} />
             Sign out
           </button>
         </div>
       )}
+
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <SignOutDialog open={signOutOpen} onClose={() => setSignOutOpen(false)} onConfirm={handleLogout} />
 
       {flyItem && (
         <div
@@ -563,11 +659,10 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
           onFocus={cancelHide}
           onBlur={scheduleHide}
         >
-          <div className="sb-fly-card">
+          <div className={`sb-fly-card${flyItem.subs.length ? " has-subs" : ""}`}>
             <span className="sb-fly-arrow" aria-hidden="true" />
             <a href={flyItem.path} className="sb-fly-head" onClick={(e) => onLinkClick(e, flyItem.path)}>
               {flyItem.label}
-              {flyItem.badge && <span className="sb-fly-new">NEW</span>}
             </a>
             {flyItem.subs.length > 0 && (
               <>
@@ -591,9 +686,11 @@ const Sidebar = ({ showUserMenu = false, showLogo = true, expanded }) => {
               </>
             )}
           </div>
+          {flyItem.hint && <p className="sb-fly-hint" role="tooltip">{flyItem.hint}</p>}
         </div>
       )}
     </aside>
+    </>
   );
 };
 

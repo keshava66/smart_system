@@ -103,17 +103,38 @@
 
 /* ========== BASE STYLES ========== */
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-jj-gray-01 text-jj-black;
     font-family: 'JohnsonText', Arial, sans-serif;
     margin: 0;
     min-height: 100vh;
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
+  :focus-visible { outline: 2px solid #eb1700; outline-offset: 2px; }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'JohnsonDisplay', Arial, sans-serif;
   }
 }
+
+/* Keyboard users jump past the navigation straight to the page. */
+.skip-link {
+  position: fixed; top: -100px; left: 8px; z-index: 100;
+  padding: 8px 14px; border-radius: 10px;
+  background: #fff; color: #1f1b18; font-family: 'JohnsonText', Arial, sans-serif; font-size: 14px;
+  box-shadow: 0 8px 24px -8px rgba(40, 20, 10, .35);
+}
+.skip-link:focus { top: 8px; }
+
+html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 
 /* ========== REACT FLOW SPECIFIC ========== */
 /* Remove additional node background */
@@ -187,18 +208,11 @@
   );
 }
 
-/* "Reduce motion" setting: kills the panel's own CSS animations (waveforms,
-   thinking dots) regardless of the OS-level prefers-reduced-motion query. */
-.regwiz-reduce-motion, .regwiz-reduce-motion * {
-  animation: none !important;
-  transition: none !important;
-}
-
 /* Page-loading bar (RouteProgress in App.jsx) */
 .route-progress { position:fixed; top:0; left:0; right:0; height:3px; z-index:9999; overflow:hidden;
   background:rgba(235,23,0,.15); pointer-events:none; }
 .route-progress::before { content:""; position:absolute; top:0; bottom:0; left:-40%; width:40%;
   background:#eb1700; box-shadow:0 0 8px rgba(235,23,0,.6); animation:route-progress 1.1s ease-in-out infinite; }
 @keyframes route-progress { to { left:100%; } }
-@media (prefers-reduced-motion: reduce) { .route-progress::before { animation:none; left:0; width:100%; opacity:.6; } }
+html.reduce-motion .route-progress::before { animation:none; left:0; width:100%; opacity:.6; }
 html:has(.route-progress) { cursor:progress; }

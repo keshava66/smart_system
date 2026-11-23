@@ -136,8 +136,13 @@ def test_embedding_dimension_mismatch_fails_loudly():
 
 
 def test_unconfigured_model_is_unavailable(monkeypatch):
-    monkeypatch.delenv("AZURE_OPENAI_EMBED_ENDPOINT", raising=False)
-    monkeypatch.delenv("AZURE_OPENAI_EMBED_API_KEY", raising=False)
+    # Shut every source the settings come from: the EMBED_* vars, the main Azure
+    # vars they fall back to, backend/.env (reloaded on first use) and dq_config.
+    for name in ("AZURE_OPENAI_EMBED_ENDPOINT", "AZURE_OPENAI_EMBED_API_KEY",
+                 "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(r, "_dotenv_loaded", True)
+    monkeypatch.setattr(r, "_assistant_config", lambda: {})
     r._cache._data.clear()
     with pytest.raises(r.EmbeddingUnavailable, match="not configured"):
         r.embed_queries(MODEL, ["x"])

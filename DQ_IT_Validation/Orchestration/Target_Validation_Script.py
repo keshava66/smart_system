@@ -38,7 +38,7 @@ def log_detailed_error(context: str, error: Exception, additional_info: Dict = N
     print_safe(f"{'=' * 80}")
     print_safe(f"Error: {str(error)}")
     if additional_info:
-        print_safe(f"\nDetails:")
+        print_safe("\nDetails:")
         for key, value in additional_info.items():
             print_safe(f"  • {key}: {value}")
     print_safe(f"{'=' * 80}\n")
@@ -500,12 +500,12 @@ class SnowflakeConnector:
 
     def ensure_connected(self) -> bool:
         if not self.is_alive():
-            print_safe(f"      ⚠️  Snowflake connection lost, reconnecting...")
+            print_safe("      ⚠️  Snowflake connection lost, reconnecting...")
             if self.reconnect():
-                print_safe(f"      ✓ Snowflake reconnected successfully")
+                print_safe("      ✓ Snowflake reconnected successfully")
                 return True
             else:
-                print_safe(f"      ✗ Snowflake reconnection failed")
+                print_safe("      ✗ Snowflake reconnection failed")
                 return False
         return True
 
@@ -1370,7 +1370,7 @@ class TargetCollector:
                 'Snowflake_Last_Updated': None,
                 'Last_Checked': datetime.now(EASTERN).isoformat()
             }
-        except Exception as e:
+        except Exception:
             executor.shutdown(wait=True)
             raise
 
@@ -1382,10 +1382,10 @@ class TargetCollector:
         if self.format_type == 'query_based':
             table_snapshot = self.table_data_list[0] if self.table_data_list else None
             if not table_snapshot:
-                print_safe(f"  ⚠️  No table data in snapshot for query-based pipeline")
+                print_safe("  ⚠️  No table data in snapshot for query-based pipeline")
                 return
 
-            print_safe(f"\n  ⏳ Validating query-based target data...")
+            print_safe("\n  ⏳ Validating query-based target data...")
             result = self._collect_and_merge_with_timeout(table_snapshot, timeout=self.table_timeout)
 
             if result['status'] == 'TIMEOUT' and self.max_retries > 0:
@@ -1569,7 +1569,7 @@ def process_single_pipeline_target(pipeline_snapshot: Dict, config: Dict, pipeli
         else:
             sf_roles = [sf_role_config]
 
-        print_safe(f"  📊 Configuration:")
+        print_safe("  📊 Configuration:")
         print_safe(f"     Oracle Schema (from snapshot): {pipeline_snapshot.get('source_schema')}")
         print_safe(f"     Snowflake Target: {sf_database}.{sf_schema}")
         print_safe(f"     Roles: {', '.join(sf_roles)}")
@@ -1579,7 +1579,7 @@ def process_single_pipeline_target(pipeline_snapshot: Dict, config: Dict, pipeli
         print_safe(f"     Tables in snapshot: {table_count}")
         print_safe(f"     Timeout: {table_timeout}s per table")
         if pipeline_snapshot.get('field_name_transformation'):
-            print_safe(f"     Column Name Transformation: ENABLED")
+            print_safe("     Column Name Transformation: ENABLED")
 
         # Create Snowflake pool manager
         if len(sf_roles) > 1:
@@ -1606,11 +1606,11 @@ def process_single_pipeline_target(pipeline_snapshot: Dict, config: Dict, pipeli
 
         try:
             # Test Snowflake connection
-            print_safe(f"  🔌 Testing Snowflake connection...")
+            print_safe("  🔌 Testing Snowflake connection...")
             sf_test = sf_pool_manager.get_connection()
             if not sf_test:
                 error_msg = 'Failed to establish Snowflake connection'
-                print_safe(f"  ❌ Failed to connect to Snowflake")
+                print_safe("  ❌ Failed to connect to Snowflake")
                 return {
                     'pipeline_name': pipeline_name, 'pipeline_number': pipeline_number,
                     'status': 'ERROR', 'error': error_msg,
@@ -1623,7 +1623,7 @@ def process_single_pipeline_target(pipeline_snapshot: Dict, config: Dict, pipeli
                 sf_pool_manager.return_connection(sf_test, sf_roles[0])
             else:
                 sf_pool_manager.return_connection(sf_test)
-            print_safe(f"  ✅ Snowflake connection established")
+            print_safe("  ✅ Snowflake connection established")
 
             collector = TargetCollector(
                 sf_pool_manager, pipeline_snapshot,
@@ -1634,7 +1634,7 @@ def process_single_pipeline_target(pipeline_snapshot: Dict, config: Dict, pipeli
             )
             collector.collect_and_merge_all()
             validation_results = collector.get_results()
-            print_safe(f"  ✅ Pipeline target collection and merge completed")
+            print_safe("  ✅ Pipeline target collection and merge completed")
 
             return {
                 'pipeline_name': pipeline_name,
@@ -1648,13 +1648,13 @@ def process_single_pipeline_target(pipeline_snapshot: Dict, config: Dict, pipeli
             }
 
         finally:
-            print_safe(f"  🧹 Cleaning up Snowflake connection pool...")
+            print_safe("  🧹 Cleaning up Snowflake connection pool...")
             skip_disconnect = False
             try:
                 if 'collector' in locals() and hasattr(collector, 'has_abandoned_threads'):
                     skip_disconnect = collector.has_abandoned_threads
                     if skip_disconnect:
-                        print_safe(f"  ⚠️  Abandoned threads detected - skipping disconnect")
+                        print_safe("  ⚠️  Abandoned threads detected - skipping disconnect")
             except:
                 pass
             try:
@@ -1706,7 +1706,7 @@ def main():
         print_safe(f"   Source report: {metadata.get('source_report', 'unknown')}")
     except FileNotFoundError:
         print_safe(f"❌ Snapshot file not found: {snapshot_path}")
-        print_safe(f"   Run Validation_Script_Source.py first to generate the snapshot.")
+        print_safe("   Run Validation_Script_Source.py first to generate the snapshot.")
         sys.exit(1)
     except json.JSONDecodeError as e:
         print_safe(f"❌ Invalid JSON in snapshot file: {e}")
@@ -1813,11 +1813,11 @@ def main():
 
     # Print overall summary — same as original
     print_header("OVERALL VALIDATION SUMMARY", "=", 80)
-    print_safe(f"\n📋 PIPELINES:")
+    print_safe("\n📋 PIPELINES:")
     print_safe(f"   Total: {consolidated_report['report_metadata']['total_pipelines']}")
     print_safe(f"   ✅ Successful: {consolidated_report['overall_summary']['successful_pipelines']}")
     print_safe(f"   ❌ Failed: {consolidated_report['overall_summary']['failed_pipelines']}")
-    print_safe(f"\n📊 TABLES:")
+    print_safe("\n📊 TABLES:")
     print_safe(f"   Total Validated: {consolidated_report['overall_summary']['total_tables_validated']}")
     print_safe(f"   ✅ Passed: {consolidated_report['overall_summary']['total_passed']}")
     print_safe(f"   🚨 Critical: {consolidated_report['overall_summary']['total_critical']}")

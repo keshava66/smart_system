@@ -15,9 +15,9 @@ from typing import Optional
 import re as _re
 import time as _time
 
-from fastapi import APIRouter, Body, HTTPException, Query, Header, Depends
+from fastapi import APIRouter, Body, HTTPException, Query, Depends
 
-from auth import require_auth, require_permission, bdc_datasets, dataset_sql, sql_literal, dataset_key
+from auth import require_permission, bdc_datasets, dataset_sql, sql_literal, dataset_key
 import db
 from consolidated_report import _rule_table_name
 

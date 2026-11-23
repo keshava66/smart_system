@@ -324,9 +324,9 @@ function suggest(raw, recent) {
   const out = [];
   for (const [term, from] of vocab) {
     const n = norm(term);
-    let kind = null;
+    let kind;
     let d = 0;
-    let score = 0;
+    let score;
     if (n === w) { kind = 'exact'; score = 100; } else if (n.startsWith(w)) { kind = 'comp'; score = 90 + Math.round((9 * w.length) / n.length); } else {
       d = osa(w, n, 2);
       if (d <= 2 && (d === 1 || w.length >= 5)) score = Math.round(100 * (1 - d / Math.max(w.length, n.length)));
@@ -1316,11 +1316,11 @@ function MetaMap({ list, items, term, pin, setPin, hover, setHover, onOpen }) {
 
   const avg = Math.round(hits.reduce((a, m) => a + m._x.score, 0) / (hits.length || 1));
   const names = (arr) => [...new Set(arr)].map((x, i) => <React.Fragment key={x}>{i > 0 && ', '}<b>{x}</b></React.Fragment>);
-  let bar = null;
+  let bar;
   if (k && hits.length) {
     const type = k[0];
     const id = k.slice(2);
-    let color = 'var(--ink)';
+    let color;
     let txt;
     if (type === 's') {
       color = (srcById[id] || OTHER).color;
@@ -2423,7 +2423,6 @@ export default function FuzzyMatch() {
   }, [railNames, results]);
   const railOrder = useMemo(() => railGroups.flatMap((g) => g.names), [railGroups]);
   const selected = railOrder.includes(selParam) ? selParam : railOrder[0] || null;
-  const grown = useGrow(res?.key || '');
   const colGrown = useGrow(`${res?.key || ''}|${selected}|${tab}`);
 
   const selectView = useCallback((n) => {

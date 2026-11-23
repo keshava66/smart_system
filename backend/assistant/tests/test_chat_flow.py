@@ -162,7 +162,7 @@ def test_table_copier_sends_the_follow_up_click(run_chat):
     _, events = run_chat([[tool_call("navigate_to", {"destination": "studio.copier"})],
                           [chunk("Opened.", finish="stop")]], "I need to copy a table")
     args = actions(events)[0]["args"]
-    assert args["params"] == {"pane": "snowflake"} and args["then_click"] == "Copy tables"
+    assert args["params"] == {"pane": "snowflake"} and args["then_click"] == "Copy a table or schema"
 
 
 def test_tour_steps_get_real_urls(run_chat):

@@ -959,7 +959,7 @@ export default function S3Pane({ logInPage, active = true }) {
       }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   // Pin a valid bucket into the URL so the address is always shareable, and

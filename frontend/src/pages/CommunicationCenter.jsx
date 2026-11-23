@@ -3,9 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { apiFetch, apiJson, downloadFile } from '../utils/apiClient';
 import { useAuth } from '../context/AuthContext';
 import {
-  CLS, Icon, Modal, PromptModal, ConfirmModal, BodyEditor, RecipientPicker,
-  RecipientField, splitAddresses, ADDR_RE, PLACEHOLDERS,
+  Icon, Modal, PromptModal, ConfirmModal, BodyEditor, RecipientPicker, RecipientField,
 } from './components/CommunicationParts';
+import { CLS, splitAddresses, ADDR_RE, PLACEHOLDERS } from './components/communicationLib';
 import { AIDraftModal, AIToolbar } from './components/CommunicationAI';
 import { WhatsNewPanel } from './components/WhatsNew';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -947,12 +947,12 @@ const CommunicationCenter = () => {
     const files = [];
     for (let index = 0; index < (entry.attachments || []).length; index += 1) {
       const meta = entry.attachments[index];
-      /* eslint-disable no-await-in-loop */
+       
       const response = await apiFetch(
         `/api/communications/history/${entry.id}/files/${index}`);
       if (!response.ok) continue;
       const blob = await response.blob();
-      /* eslint-enable no-await-in-loop */
+       
       files.push(new File([blob], meta.filename,
         { type: blob.type || 'application/octet-stream' }));
     }

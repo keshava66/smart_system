@@ -844,9 +844,7 @@ button.sx-frag-foot:hover { background: var(--frag-bg); }
 @media (max-height: 820px) { .ss-route { display: none; } }
 .ss-route.is-flowview { display: none; }   /* the flow's Read / Write bands say the same */
 
-@media (prefers-reduced-motion: reduce) {
-  .ss-root *, .ss-root *::before, .ss-root *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-}
+html.reduce-motion .ss-root *, html.reduce-motion .ss-root *::before, html.reduce-motion .ss-root *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 `;
 
 /* ---------------------- plain-English text + values ---------------------- */

@@ -1694,7 +1694,7 @@ def _sf_to_pg(job: Dict[str, Any], item: Dict[str, Any], work_dir: str) -> int:
                 override = " OVERRIDING SYSTEM VALUE" if pg.server_version >= 100000 else ""
                 c.execute(f"INSERT INTO {tgt_fq} ({cols_sql}){override} SELECT {cols_sql} FROM {stg_fq}")
                 c.execute(f"DROP TABLE {stg_fq}")
-                done = (f"replaced the rows of" if body.if_exists == "overwrite" else "appended to") \
+                done = ("replaced the rows of" if body.if_exists == "overwrite" else "appended to") \
                     + f" {body.target_schema}.{item['target']}"
         pg.commit()
         finalized = True

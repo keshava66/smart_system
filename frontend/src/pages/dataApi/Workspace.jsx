@@ -6,7 +6,8 @@ import EndpointsTab from './Endpoints';
 import { ColumnChooser, TablePicker } from './Publish';
 import SemanticTab from './SemanticTab';
 import { absolute, ALIAS_COLORS, API_COLORS, baseUrl, cleanAlias, copyText, describeAgent, describeIp, emptyPick, ET, fmt, fmtDur, guideFilename, maskKey, parseTs, pctChange, pickReady, pickToSpec, plural, relative, request, shortDate, sum, tableToSpec, TABS, toolOf, TOOLS, useConfirm, useLocalSetting, usePage, usePoll, useResource, useScramble, useSlow, useToast } from './lib';
-import { Busybar, CountUp, Dot, Drawer, DrawerHead, EnvTag, ErrorBox, HoldToReveal, Kbd, Orb, RowLimitField, Seg, Sk, SourceLogo, Spark, Spinner, SrcTag, StackChart, StateBox, StatusPill, highlightCode, Steps, ToolTile } from './ui';
+import { Busybar, CountUp, Dot, Drawer, DrawerHead, EnvTag, ErrorBox, HoldToReveal, Kbd, Orb, RowLimitField, Seg, Sk, SourceLogo, Spark, Spinner, SrcTag, StackChart, StateBox, StatusPill, Steps, ToolTile } from './ui';
+import { highlightCode } from './highlight';
 
 function Sidebar({ currentSlug }) {
   const { overview, nav, range, openPalette } = usePage();

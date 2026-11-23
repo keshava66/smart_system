@@ -913,4 +913,4 @@
 .itc :is(tr, .kpi, .cbar, .check-row):hover .num-x .s { width: 0; direction: rtl; }
 .itc .num-x:hover .e,
 .itc :is(tr, .kpi, .cbar, .check-row):hover .num-x .e { width: auto; direction: ltr; }
-@media (prefers-reduced-motion: reduce) { .itc .num-x > span { transition: opacity .01s; transform: none !important; filter: none !important; } }
+html.reduce-motion .itc .num-x > span { transition: opacity .01s; transform: none !important; filter: none !important; }

@@ -153,7 +153,6 @@ def _write_report_to_snowflake_gen(
         insert_sql = f"INSERT INTO {full_report_table} ({col_names}) VALUES ({placeholders})"
 
         # ── Vectorized serialization ──────────────────────────────────────────
-        import numpy as _np
 
         # Step 1 — one C-level pass: box everything to Python objects,
         # NaN / NaT / pd.NA → None.  Same as the original fast path.
@@ -456,9 +455,6 @@ def _build_excel_gen(
     fmt_rule_red = wb.add_format({**_rf, "font_color": "#DC2626"})  # >=16 days / null -- regular red
     fmt_rule_black = wb.add_format({**_rf, "font_color": "#312C2A"})  # no colour columns
     sep_run_fmt = wb.add_format({"font_name": "Calibri", "font_size": 10, "font_color": "#A39992"})
-    single_rule_fmt_base = wb.add_format({"bg_color": "#FFFFFF", "border": 1,
-                                          "font_name": "Calibri", "font_size": 10,
-                                          "font_color": "#312C2A"})
     # Cache for single-rule bordered formats keyed by (hex, bold)
     _sr_fmt_cache = {}
 

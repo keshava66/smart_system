@@ -367,7 +367,7 @@ export function useDirectoryPhotos(people = []) {
     return () => {
       cancelled = true;
     };
-  }, [key, accounts.length, instance]);
+  }, [key, accounts.length, instance]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on stable primitives; MSAL hands back a new accounts array on every auth event
 
   // Stable until a photo arrives, so callers can memoise on it
   return useCallback((person) => {

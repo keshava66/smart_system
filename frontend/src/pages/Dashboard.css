@@ -301,7 +301,7 @@
   .shd-line2 { white-space: normal; }
 }
 
-/* Lite scene for GPU-less / reduced-motion machines. Every animation keeps
+/* Lite scene for GPU-less machines and the "Reduce motion" setting. Every animation keeps
    running; what goes is the work a CPU rasteriser pays for on each frame -
    the rotating sweep, the big blurred glow, and backdrop blurs sitting on
    top of a canvas that repaints 20 times a second. */
@@ -310,3 +310,8 @@
 .shd-lite .shd-chip, .shd-lite .shd-cmd-box, .shd-lite .shd-rcard,
 .shd-lite .shd-glass, .shd-lite .shd-otip { backdrop-filter: none; }
 .shd-lite .shd-cmd-box, .shd-lite .shd-rcard { background: rgba(255,255,255,.96); }
+
+/* Large and ultrawide monitors: fewer, roomier cards so tags and copy don't clip. */
+@container shd (min-width: 1800px) {
+  .shd-grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 22px; }
+}

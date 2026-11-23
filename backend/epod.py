@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import io
 import logging
-import threading
 import time
 from decimal import Decimal
 from datetime import date, datetime, time as time_, timedelta

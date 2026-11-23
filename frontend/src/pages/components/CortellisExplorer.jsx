@@ -246,7 +246,8 @@ const STYLES = `
   .ct-tabscroll.ct-tabscroll:hover { scrollbar-color: #d6cec7 transparent; }
 }
 /* reduce motion (also Windows 'animation effects' off): no sweep, slow fade so it still reads as loading */
-@media (prefers-reduced-motion: reduce) { .ct-rise, .ct-pop { animation: none; } .ct-shimmer { animation: ct-pulse 1.8s ease-in-out infinite; } }
+html.reduce-motion .ct-rise, html.reduce-motion .ct-pop { animation: none; }
+html.reduce-motion .ct-shimmer { animation: ct-pulse 1.8s ease-in-out infinite; }
 `;
 
 // /api/cortellis sends NDJSON, one line per finished piece (counts, charts,

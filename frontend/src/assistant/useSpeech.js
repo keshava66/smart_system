@@ -82,7 +82,7 @@ export function useSpeech({ onBoundary, onTranscript, onError } = {}) {
     synth.speak(u);
   }, [synth, onBoundary]);
 
-  const cancelSpeech = useCallback(() => { try { synth?.cancel(); } catch {} }, [synth]);
+  const cancelSpeech = useCallback(() => { try { synth?.cancel(); } catch { /* engine already idle */ } }, [synth]);
   const isSpeaking = useCallback(() => !!synth?.speaking, [synth]);
 
   const startListening = useCallback(() => {
@@ -116,7 +116,7 @@ export function useSpeech({ onBoundary, onTranscript, onError } = {}) {
     try { r.start(); } catch { setListening(false); onError?.('Could not start the microphone.'); }
   }, [Recognition, listening, onTranscript, onError]);
 
-  const stopListening = useCallback(() => { try { recogRef.current?.stop(); } catch {} }, []);
+  const stopListening = useCallback(() => { try { recogRef.current?.stop(); } catch { /* recognizer already stopped */ } }, []);
 
   return {
     speak, cancelSpeech, isSpeaking,

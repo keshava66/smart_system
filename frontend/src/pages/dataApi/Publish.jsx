@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ADDR_RE, RecipientField, splitAddresses } from '../components/CommunicationParts';
+import { RecipientField } from '../components/CommunicationParts';
+import { ADDR_RE, splitAddresses } from '../components/communicationLib';
 import { ArrowLeft, ArrowRight, Bold, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Copy, Database, ExternalLink, FileText, Heading, Italic, KeyRound, Layers, Link2, List, ListOrdered, Lock, Mail, Paperclip, Sparkles, Table2, Trash2, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { buildConsumerDoc, downloadTextFile, tableUiUrl, tableUrl } from './dataApiDocs';
 import { aliasFromTable, baseUrl, bytes, cleanAlias, copyText, emptyPick, guideFilename, maskKey, pickReady, pickToSpec, plural, request, slugify, tablePath, useConfirm, usePage, useResource, useScramble, useToast } from './lib';
 import { Drawer, DrawerHead, ErrorBox, Orb, RowLimitField, Seg, Sk, SourceLogo, Spinner, Steps } from './ui';
 import IndexBuilder from './IndexBuilder';
+import { mdToHtml } from './markdown';
+import { reducedMotion } from '../../utils/motion';
 
 const ENV_ORDER = ['dev', 'qa', 'prod'];
 const qs = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v)).toString();
@@ -555,7 +558,7 @@ function Confetti() {
   const ref = useRef(null);
   useEffect(() => {
     const cv = ref.current;
-    if (!cv || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    if (!cv || reducedMotion()) return undefined;
     const ctx = cv.getContext('2d');
     const W = (cv.width = cv.clientWidth);
     const H = (cv.height = cv.clientHeight);
@@ -794,7 +797,7 @@ function draftKeyEmail(api, caps, to, variant = 'default') {
    from the draft, the message, and the base URL and guide under Resources.
    Used by both the preview and the send, so they always match. The layout
    never carries the key. */
-export function composeKeyEmail(api, body, guide, brand) {
+function composeKeyEmail(api, body, guide, brand) {
   const base = baseUrl(api.slug);
   const docs = `${window.location.origin}/data-api?api=${encodeURIComponent(api.slug)}&tab=docs`;
   const resources = [];
@@ -869,7 +872,7 @@ function HouseFrame({ html, state }) {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [html]);
   return (
     <div className="mhouse">
@@ -940,50 +943,11 @@ function Preview({ api, m, opts, sender, device }) {
    token) but stored as the same markdown-lite the Communication Center
    template reads, so the server, the AI rewrite and the {{key}} check all
    see exactly what they did before. */
-const escHtml = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const TOKEN_LABEL = { '{{key}}': 'API key', '{{base_url}}': 'Base URL' };
-
-function mdInline(text) {
-  return escHtml(text)
-    .replace(/\{\{(key|base_url)\}\}/g, (m) => `<span class="rtok" contenteditable="false" data-token="${m}">${TOKEN_LABEL[m]}</span>`)
-    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2">$1</a>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>');
-}
-
-function mdToHtml(md) {
-  const lines = String(md || '').replace(/\r\n?/g, '\n').split('\n');
-  const out = [];
-  let para = [];
-  let list = null;
-  const flushPara = () => { if (para.length) out.push(`<p>${para.map(mdInline).join('<br>')}</p>`); para = []; };
-  const flushList = () => { if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${mdInline(i)}</li>`).join('')}</${list.tag}>`); list = null; };
-  lines.forEach((raw) => {
-    const line = raw.trim();
-    const h = line.match(/^#{1,3}\s+(.*)$/);
-    const b = line.match(/^[-*]\s+(.*)$/);
-    const n = line.match(/^\d+[.)]\s+(.*)$/);
-    if (!line) { flushPara(); flushList(); return; }
-    if (h) { flushPara(); flushList(); out.push(`<h3>${mdInline(h[1])}</h3>`); return; }
-    if (b || n) {
-      flushPara();
-      const tag = b ? 'ul' : 'ol';
-      if (list && list.tag !== tag) flushList();
-      if (!list) list = { tag, items: [] };
-      list.items.push((b || n)[1]);
-      return;
-    }
-    flushList();
-    para.push(raw.replace(/^\s{4,}/, '    '));
-  });
-  flushPara(); flushList();
-  return out.join('');
-}
 
 function inlineMd(node) {
   let s = '';
   node.childNodes.forEach((c) => {
-    if (c.nodeType === 3) { s += c.textContent.replace(/ /g, ' '); return; }
+    if (c.nodeType === 3) { s += c.textContent.replace(/\u00a0/g, ' '); return; }
     if (c.nodeType !== 1) return;
     const tag = c.tagName.toLowerCase();
     if (c.dataset?.token) { s += c.dataset.token; return; }
@@ -1156,7 +1120,7 @@ export function EmailKeyDrawer({ api, onClose }) {
 
   const typeBody = (text) => {
     clearInterval(typer.current);
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    if (reducedMotion()) {
       set({ body: text, typing: false });
       return;
     }

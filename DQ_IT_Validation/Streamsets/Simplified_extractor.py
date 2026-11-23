@@ -13,7 +13,54 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Only silences the warning when STREAMSETS_VERIFY=false was chosen on purpose.
+if (os.environ.get('STREAMSETS_VERIFY') or '').strip().lower() in ('0', 'false', 'no', 'off'):
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def _tls_verify():
+    """Certificate checking for Control Hub calls. STREAMSETS_VERIFY: true (default),
+    false, or the path of a CA bundle."""
+    raw = (os.environ.get('STREAMSETS_VERIFY') or 'true').strip()
+    if raw.lower() in ('0', 'false', 'no', 'off'):
+        return False
+    if raw.lower() in ('1', 'true', 'yes', 'on'):
+        return True
+    return raw
+
+
+def _trusted_ssh_client():
+    """An SSH client that only talks to known Data Collectors: the password goes to whoever
+    answers, so an unknown host key is refused. Trust comes from STREAMSETS_SSH_KNOWN_HOSTS
+    (else the system known_hosts) or STREAMSETS_SSH_HOST_KEYS, a JSON map of
+    host -> "SHA256:..." fingerprint."""
+    import base64
+    import hashlib
+    try:
+        pinned = json.loads(os.environ.get('STREAMSETS_SSH_HOST_KEYS') or '{}')
+    except ValueError:
+        pinned = {}
+
+    class _Pinned(paramiko.MissingHostKeyPolicy):
+        def missing_host_key(self, client, hostname, key):
+            fp = "SHA256:" + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode().rstrip("=")
+            if pinned.get(hostname) == fp:
+                client.get_host_keys().add(hostname, key.get_name(), key)
+                return
+            raise paramiko.SSHException(f"untrusted host key {fp} for {hostname}; add it to known_hosts "
+                                        f"or STREAMSETS_SSH_HOST_KEYS")
+
+    client = paramiko.SSHClient()
+    try:
+        known = os.environ.get('STREAMSETS_SSH_KNOWN_HOSTS')
+        if known:
+            client.load_host_keys(os.path.expanduser(known))
+        else:
+            client.load_system_host_keys()
+    except OSError:
+        pass
+    client.set_missing_host_key_policy(_Pinned())
+    return client
 
 
 class Config:
@@ -51,7 +98,7 @@ class Config:
         if not os.path.exists(config_file):
             print(f"\n❌ ERROR: Configuration file '{config_file}' not found!")
             print(f"   Please create '{config_file}' in the same directory as this script.")
-            print(f"   See the documentation for the required configuration format.")
+            print("   See the documentation for the required configuration format.")
             sys.exit(1)
 
         parser = configparser.ConfigParser()
@@ -104,7 +151,7 @@ class StreamSetsAPIClient:
                 auth_url,
                 json={"userName": username, "password": password},
                 headers={"Content-Type": "application/json", "X-Requested-By": "SCH"},
-                verify=False,
+                verify=_tls_verify(),
                 timeout=30
             )
 
@@ -146,7 +193,7 @@ class StreamSetsAPIClient:
         encoded_parts = [quote(part, safe='') if part else part for part in parts]
         url = f"{self.base_url}/{'/'.join(encoded_parts)}"
 
-        kwargs.setdefault('verify', False)
+        kwargs.setdefault('verify', _tls_verify())
         kwargs.setdefault('timeout', Config.REQUEST_TIMEOUT)
 
         try:
@@ -218,8 +265,7 @@ class SDCClient:
                 return True
 
             try:
-                self.ssh_client = paramiko.SSHClient()
-                self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                self.ssh_client = _trusted_ssh_client()
                 self.ssh_client.connect(
                     self.host,
                     self.port,
@@ -255,7 +301,7 @@ class SDCClient:
         except FileNotFoundError:
             # Don't print here, will be handled by ResourceResolver
             return None
-        except Exception as e:
+        except Exception:
             # Don't print here, will be handled by ResourceResolver
             return None
 
@@ -370,7 +416,7 @@ class ResourceResolver:
             print("⚠️  No connected SDCs available for resource resolution")
             return {k: (v, None, None) for k, v in param_defs.items()}
 
-        print(f"\n🔍 Resolving runtime:loadResource() parameters...")
+        print("\n🔍 Resolving runtime:loadResource() parameters...")
         resolved_count = 0
         failed_count = 0
 
@@ -442,7 +488,7 @@ class DataExtractor:
     def get_pipeline_version_info(self, pipeline_id: str) -> Optional[Dict]:
         """Get latest pipeline version/commit information"""
         try:
-            print(f"🔍 Fetching latest pipeline version...")
+            print("🔍 Fetching latest pipeline version...")
             endpoint = f"pipelinestore/rest/v1/pipeline/{pipeline_id}/latest"
             data = self.api.request("GET", endpoint)
 
@@ -465,10 +511,10 @@ class DataExtractor:
     def get_job_runtime_info(self, job_details: Dict, job_status: Dict) -> Optional[Dict]:
         """Get job runtime information from job details and status"""
         try:
-            print(f"🔍 Extracting job runtime information...")
+            print("🔍 Extracting job runtime information...")
 
             if not job_details and not job_status:
-                print(f"   ⚠️  No job details or status available")
+                print("   ⚠️  No job details or status available")
                 return None
 
             runtime_info = {}
@@ -530,7 +576,7 @@ class DataExtractor:
             ])
 
             if not has_data:
-                print(f"   ⚠️  No runtime information available (job may not have run yet)")
+                print("   ⚠️  No runtime information available (job may not have run yet)")
                 return None
 
             # Status message
@@ -645,7 +691,7 @@ class DataExtractor:
                             sdc_ids.add(sdc_item)
 
                 if not sdc_ids:
-                    print(f"      ⚠️  No SDCs found for this job")
+                    print("      ⚠️  No SDCs found for this job")
 
                 for sdc_id in sdc_ids:
                     if any(sdc.get('id') == sdc_id for sdc in data_collectors):
@@ -776,7 +822,7 @@ class DataExtractor:
 
         try:
             # Get basic job metrics
-            print(f"         Fetching job metrics...")
+            print("         Fetching job metrics...")
             job_metrics = self.api.request('GET', f'jobrunner/rest/v1/metrics/job/{job_id}')
             if job_metrics:
                 metrics['job_metrics'] = job_metrics
@@ -792,27 +838,27 @@ class DataExtractor:
                         'end_time': job_metrics.get('endTime'),
                         'status': job_metrics.get('status', 'Unknown')
                     }
-                print(f"         ✅ Job metrics retrieved")
+                print("         ✅ Job metrics retrieved")
             else:
-                print(f"         ⚠️  No job metrics available")
+                print("         ⚠️  No job metrics available")
 
             # Get time series record counts
-            print(f"         Fetching record counts over time...")
+            print("         Fetching record counts over time...")
             record_counts = self.api.request('GET', f'timeseries/rest/v1/metrics/job/{job_id}/recordCount')
             if record_counts:
                 metrics['record_counts'] = record_counts
-                print(f"         ✅ Record counts retrieved")
+                print("         ✅ Record counts retrieved")
             else:
-                print(f"         ⚠️  No record count data available")
+                print("         ⚠️  No record count data available")
 
             # Get time series throughput
-            print(f"         Fetching record throughput over time...")
+            print("         Fetching record throughput over time...")
             throughput = self.api.request('GET', f'timeseries/rest/v1/metrics/job/{job_id}/recordThroughput')
             if throughput:
                 metrics['record_throughput'] = throughput
-                print(f"         ✅ Record throughput retrieved")
+                print("         ✅ Record throughput retrieved")
             else:
-                print(f"         ⚠️  No throughput data available")
+                print("         ⚠️  No throughput data available")
 
         except Exception as e:
             print(f"         ⚠️  Error fetching execution metrics: {e}")
@@ -1684,7 +1730,7 @@ class StageExtractor:
                                 rules.append(f"Replaces '{fields}' with '{replacement}'")
 
             if rules:
-                return f"Field Replacer: " + "; ".join(rules)
+                return "Field Replacer: " + "; ".join(rules)
             else:
                 return "Field Replacer: No rules configured"
 
@@ -1734,7 +1780,7 @@ class StageExtractor:
                             renames.append(f"'{from_field}' → '{to_field}'")
 
             if renames:
-                return f"Field Renamer: " + "; ".join(renames)
+                return "Field Renamer: " + "; ".join(renames)
             else:
                 return "Field Renamer: No renames configured"
 
@@ -1751,7 +1797,7 @@ class StageExtractor:
                                 conversions.append(f"'{field}' → {target_type}")
 
             if conversions:
-                return f"Field Type Converter: " + "; ".join(conversions)
+                return "Field Type Converter: " + "; ".join(conversions)
             else:
                 return "Field Type Converter: No conversions configured"
 
@@ -1767,7 +1813,7 @@ class StageExtractor:
                             conditions.append(f"Lane '{output_lane}': {predicate}")
 
             if conditions:
-                return f"Stream Selector: Routes based on conditions - " + "; ".join(conditions)
+                return "Stream Selector: Routes based on conditions - " + "; ".join(conditions)
             else:
                 return "Stream Selector: Routes records based on conditions"
 
@@ -1781,7 +1827,7 @@ class StageExtractor:
                         predicates.append(pred)
 
             if predicates:
-                return f"Filter: " + "; ".join(predicates)
+                return "Filter: " + "; ".join(predicates)
             else:
                 return "Filter: Filters records based on predicates"
 
@@ -1797,7 +1843,7 @@ class StageExtractor:
                             agg_expressions.append(f"{name}: {expression}")
 
             if agg_expressions:
-                return f"Aggregator: " + "; ".join(agg_expressions)
+                return "Aggregator: " + "; ".join(agg_expressions)
             else:
                 return "Aggregator: Aggregates data"
 
@@ -1893,7 +1939,7 @@ class StageExtractor:
             commit_data = self.api.request('GET', f'pipelinestore/rest/v1/pipelineCommit/{pipeline_commit_id}')
 
             if not commit_data:
-                print(f"         ⚠️  Could not fetch commit data")
+                print("         ⚠️  Could not fetch commit data")
                 return None
 
             commit_info = {
@@ -1929,7 +1975,7 @@ class StageExtractor:
                 except json.JSONDecodeError as e:
                     print(f"         ⚠️  Could not parse pipeline definition: {e}")
             else:
-                print(f"         ⚠️  No pipeline definition in commit")
+                print("         ⚠️  No pipeline definition in commit")
 
             return commit_info
 
@@ -1976,7 +2022,7 @@ class StageExtractor:
                 summary = self.generate_fragment_summary(commit_info)
                 commit_info['fragment_summary'] = summary
                 stage['enriched_commit_info'] = commit_info
-                print(f"      ✅ Enriched stage with commit information")
+                print("      ✅ Enriched stage with commit information")
                 print(f"      📝 Summary: {summary}")
 
         return stage
@@ -2007,7 +2053,7 @@ class StageExtractor:
                     break
 
             if not pipeline:
-                print(f"   ⚠️  Could not find pipeline for stage extraction")
+                print("   ⚠️  Could not find pipeline for stage extraction")
                 return None
 
             pipeline_id = pipeline.get('pipelineId')
@@ -2071,10 +2117,10 @@ class StageExtractor:
                 else:
                     other.append(stage)
 
-            print(f"   ✅ Categorization complete")
+            print("   ✅ Categorization complete")
 
             # Enrich stages with commit information
-            print(f"   📋 Enriching stages with commit information...")
+            print("   📋 Enriching stages with commit information...")
             enriched_processors = []
             for stage in processors:
                 enriched_stage = self.enrich_stage_with_commit_info(stage)
@@ -2085,10 +2131,10 @@ class StageExtractor:
                 enriched_stage = self.enrich_stage_with_commit_info(stage)
                 enriched_other.append(enriched_stage)
 
-            print(f"   ✅ Stage enrichment complete")
+            print("   ✅ Stage enrichment complete")
 
             # Add summaries to ALL stages
-            print(f"   📋 Generating summaries for all stages...")
+            print("   📋 Generating summaries for all stages...")
             all_enriched_stages = enriched_processors + enriched_other
 
             for stage in all_enriched_stages:
@@ -2097,7 +2143,7 @@ class StageExtractor:
             print(f"   ✅ Generated summaries for {len(all_enriched_stages)} stages")
 
             # Generate comprehensive summaries list
-            print(f"   📋 Compiling comprehensive stage summaries...")
+            print("   📋 Compiling comprehensive stage summaries...")
             all_stage_summaries = []
 
             for stage in all_enriched_stages:
@@ -2317,7 +2363,7 @@ def main():
     print(f"📁 Output Directory: {Config.OUTPUT_DIR}")
     print(f"⏱️  Request Timeout: {Config.REQUEST_TIMEOUT}s")
     print(f"🔄 Thread Pool Size: {Config.THREAD_POOL_SIZE}")
-    print(f"📡 Resource Resolution: SSH/SFTP Connection Pool (port 22)")
+    print("📡 Resource Resolution: SSH/SFTP Connection Pool (port 22)")
     print("=" * 60)
 
     extractor = StreamSetsExtractor()

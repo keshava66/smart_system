@@ -78,6 +78,16 @@ d("bdc", "Business Defined Checks", "/dqe", {"check": "Business_defined_checks"}
   about="Business-written rules turned into SQL by AI. Users with the executive permission land on "
         "the Executive View; everyone else lands on the Overview tab.")
 
+d("dqe.indcta", "IND/CTA Data Quality", "/dqe", {"check": "IND_CTA_DQ"}, parent="dqe",
+  perms=("viewIndCtaQuality",),
+  aliases=("ind cta data quality", "ind/cta data quality", "ind cta", "ind/cta", "ind cta dq",
+           "ind cta issues", "ind cta tracker", "cta data quality"),
+  about="Live IND/CTA issue tracker: open vs fixed, rule hotspots, name match scores.")
+
+d("dqe.safety", "Safety", "/dqe", {"check": "Safety_DQ"}, parent="dqe", perms=("viewSafetyDQ",),
+  aliases=("safety dq", "safety data quality", "safety dashboard", "safety checks", "safety pass rates"),
+  about="Safety data quality dashboard: pass rates by dimension, domain and rule.")
+
 # Tabs need view=standard: executive users get the tab bar hidden without it.
 STD = {"check": "Business_defined_checks", "view": "standard"}
 
@@ -152,6 +162,18 @@ d("ingest", "Ingestion Lab", "/ingestion-lab", perms=("viewIngestionLab",),
            "run ingestion", "run extraction", "extraction script", "ingestion runs", "ingestion history"),
   about="Run the configured ingestion steps on the server: inputs, live output, stop, run history.")
 
+# ---- Pipeline Studio ----
+d("pipelines", "Pipeline Studio", "/pipeline-studio", perms=("runStreamsetsExtractor",),
+  aliases=("pipeline studio", "pipeline validation", "validate pipeline", "pipeline flow",
+           "pipeline stages", "pipeline parameters"),
+  about="Open any StreamSets pipeline to see its flow, stages and parameters, extract it, and validate "
+        "the source against Snowflake.")
+
+# ---- About ----
+d("about", "About us", "/about",
+  aliases=("about us", "about", "about smarthub", "what is smarthub", "mission"),
+  about="What SmartHub is for and what each part of it delivers.")
+
 # ---- EvidenceFlow ----
 d("evidenceflow", "EvidenceFlow", "/evidenceflow", perms=("viewEvidenceFlow",),
   aliases=("evidenceflow", "evidence flow", "evidence", "pbrer", "dsur", "original pdf review"),
@@ -188,6 +210,10 @@ d("un.vr.external", "External", "/unstructured-explorer", {"doctype": "vr", "vrs
   parent="un.vr", perms=("viewUnstructuredVRExternal",),
   aliases=("virtual regulator external", "external virtual regulator", "fda press releases", "health authority tables"),
   about="Pick a health authority, then a table. FDA press releases have Explore and Data table; other tables open as a data table.")
+d("un.vr.cortellis", "Cortellis", "/unstructured-explorer", {"doctype": "vr", "vrscope": "cortellis"},
+  parent="un.vr", perms=("viewUnstructuredVRCortellis",),
+  aliases=("cortellis", "virtual regulator cortellis", "cortellis tables", "cortellis data"),
+  about="Cortellis regulatory intelligence tables, opened from the Virtual Regulator scope dropdown.")
 
 d("un.mirai", "MirAI", "/unstructured-explorer", {"doctype": "mirai"}, parent="unstructured", perms=("viewUnstructuredMirAI",),
   aliases=("mirai", "mir ai", "mirai explorer"), about="Coming soon - placeholder page for now.")
@@ -278,18 +304,21 @@ d("studio.snowflake", "Snowflake", "/data-studio", {"pane": "snowflake"}, parent
   aliases=("snowflake", "snowflake worksheet", "snowflake worksheets", "worksheet", "worksheets",
            "sql worksheet", "run sql", "snowflake sql", "query snowflake", "data editor",
            "edit table rows", "edit rows", "saved queries", "query history", "switch snowflake role",
-           "run all statements"),
+           "run all statements", "query runner", "sql query runner", "sf query runner",
+           "snowflake query runner"),
   about="Worksheets with full SQL against Snowflake, object explorer, results grid, data editor. Each worksheet picks its login and role.")
 d("studio.postgres", "Postgres", "/data-studio", {"pane": "postgres"}, parent="studio",
   perms=("runPostgresStudio",),
   aliases=("postgres worksheet", "postgres worksheets", "query postgres", "postgresql worksheet",
-           "postgres data editor", "edit postgres rows", "postgres sql worksheet", "switch postgres user"),
+           "postgres data editor", "edit postgres rows", "postgres sql worksheet", "switch postgres user",
+           "postgres query runner", "pg query runner", "postgresql query runner"),
   about="Worksheets with full SQL against PostgreSQL, same as the Snowflake tab: explorer, results grid, data editor. "
         "Each worksheet picks its login and database and keeps its own session, so SET and temp tables carry over between runs.")
 d("studio.copier", "Copy tables", "/data-studio", {"pane": "snowflake"}, parent="studio.snowflake",
   aliases=("table copier", "copy tables", "copy table", "copy a table", "copy schema", "clone table"),
-  then_click="Copy tables",
-  about="Table Copier: copy a table or a whole schema (opens from the 'Copy tables' button).")
+  then_click="Copy a table or schema",
+  about="Table Copier: copy a table or a whole schema (opens from the 'Copy a table or schema' button "
+        "in the Snowflake toolbar).")
 d("studio.indexer", "Index Health", "/data-studio", {"pane": "indexer"}, parent="studio",
   perms=("viewPGindexer",),
   aliases=("index health", "indexer", "postgres indexes", "missing indexes", "index check", "build indexes"),
@@ -340,6 +369,10 @@ d("rag.epod", "EPOD RAG", "/rag", {"tab": "epod"}, parent="rag", perms=("viewEPo
   aliases=("epod rag", "epod chat", "ask epod"))
 d("rag.rimdocs", "RIMDOCS RAG", "/rag", {"tab": "rimdocs"}, parent="rag", perms=("viewRimDocsRAG",),
   aliases=("rimdocs rag", "rim docs rag", "rimdocs chat", "ask rimdocs"))
+d("rag.evaluation", "RAG Evaluation", "/rag/evaluation", perms=("viewRimDocsAgentic",),
+  aliases=("rag evaluation", "evaluation and regression", "rag regression", "rag eval", "evaluate rag",
+           "retrieval evaluation"),
+  about="Evaluation & regression runs for the RIMDocs agentic RAG: scores per question set and how they moved.")
 d("rag.agentic", "RIMDocs Agentic", "/rag", {"tab": "rimdocs-agentic"}, parent="rag",
   perms=("viewRimDocsAgentic",),
   aliases=("rimdocs agentic", "agentic", "agentic rag", "rim docs agentic"))
@@ -396,24 +429,34 @@ d("audit", "Audit Log", "/audit", perms=("viewAudit",),
   aliases=("audit log", "audit", "audit trail", "activity log", "stream", "event stream",
            "who is online", "who's signed in", "active users"),
   about="Who is signed in now plus every sign-in, page view and role change. Stream view by default.")
+d("audit.people", "People", "/audit", {"view": "people"}, parent="audit",
+  aliases=("audit people", "people view", "who uses the portal", "user activity", "per user activity"),
+  ambiguous_alone=True,
+  about="Everyone who has used the portal, with their activity.")
 d("audit.analytics", "Analytics", "/audit", {"view": "analytics"}, parent="audit",
   aliases=("audit analytics", "analytics", "activity analytics", "usage analytics", "usage charts",
            "portal usage"),
   about="Charts of portal activity.")
-for key, label, patch, al in (
+# Filtered views of the stream. The page applies these from the URL; the names
+# describe the filter (there's no button with this label to look for).
+for key, label, patch, al, about in (
     ("security", "Security review", {"cat": "Roles", "range": "7d"},
-     ("security review", "role changes", "role change log", "roles category")),
+     ("security review", "role changes", "role change log", "roles category"),
+     "Roles category, last 7 days: every role and permission change."),
     ("access", "Access issues", {"cat": "Access", "q": "timeout"},
-     ("access issues", "session timeouts", "timeouts", "login problems", "sign in issues")),
+     ("access issues", "session timeouts", "timeouts", "login problems", "sign in issues"),
+     "Access category searched for timeouts."),
     ("admin", "Admin trail", {"cat": "Admin", "range": "all"},
-     ("admin trail", "admin actions", "admin activity")),
+     ("admin trail", "admin actions", "admin activity"),
+     "Admin category, all time."),
     ("rules", "Rule decisions", {"cat": "Data", "range": "30d", "q": "rule"},
-     ("rule decisions", "rule approvals", "review decisions")),
+     ("rule decisions", "rule approvals", "review decisions"),
+     "Data category, last 30 days, searched for rule decisions."),
     ("nav", "Navigation", {"cat": "Navigation", "range": "24h"},
-     ("page views", "navigation events", "navigation log")),
+     ("page views", "navigation events", "navigation log"),
+     "Navigation category, last 24 hours: page views."),
 ):
-    d(f"audit.{key}", label, "/audit", patch, parent="audit", aliases=al,
-      about=f"Saved view '{label}'.")
+    d(f"audit.{key}", label, "/audit", patch, parent="audit", aliases=al, about=about)
 
 
 DESTINATIONS = {x.id: x for x in _D}
@@ -422,7 +465,7 @@ assert len(DESTINATIONS) == len(_D), "duplicate destination id"
 # Query-string keys each route understands, and the allowed values where the
 # set is fixed. Anything else the model tries to pass is dropped.
 ALLOWED_PARAMS = {
-    "/dqe": {"check": {"IT_Checks", "Data_Validation", "Business_defined_checks"},
+    "/dqe": {"check": {"IT_Checks", "Data_Validation", "Business_defined_checks", "IND_CTA_DQ", "Safety_DQ"},
              "tab": {"overview", "dataset-health", "trends", "failed-rows", "admin", "review"},
              "dqtab": {"rule-input", "rule-registry", "date-input"},
              "view": {"standard"}, "mode": {"delta"}},
@@ -432,24 +475,24 @@ ALLOWED_PARAMS = {
     "/data-studio": {"pane": {"snowflake", "postgres", "indexer", "s3", "streamsets", "shuttle"}, "bucket": None, "account": None, "prefix": None,
                      "key": None, "q": None, "view": {"search"}},
     "/unstructured-explorer": {"doctype": {"vr", "immbot", "mirai", "rmwcreate", "rimdocs", "fda", "epod", "haq", "nipo"},
-                               "tab": {"overview", "table", "breakdown", "query", "postgres"},
+                               "tab": {"overview", "table", "breakdown"},
                                "epodtab": {"explore", "table"}, "nipotab": {"explore", "table"},
                                "fdatab": {"explore", "table"},
                                "immbottab": {"explore", "table", "breakdown"},
                                "vrtab": {"explore", "library", "table"},
-                               "vrscope": {"internal", "external"},
+                               "vrscope": {"internal", "external", "cortellis"},
                                "fdadashboard": {x[0] for x in FDA_DASHBOARDS},
                                "epoddataset": None},
     "/gra-data-domains": {"view": {"directory"}, "tab": {"people", "records"}, "domain": None,
                           "open": {"1"}, "q": None},
     "/data-api": {"api": None, "tab": {"overview", "tables", "search", "endpoints", "docs", "activity"},
                   "new": {"1"}},
-    "/audit": {"view": {"analytics", "stream"}, "q": None, "cat": {"all", "Roles", "Access", "Data",
+    "/audit": {"view": {"analytics", "stream", "people"}, "q": None, "cat": {"all", "Roles", "Access", "Data",
                "Navigation", "Admin"}, "range": {"24h", "7d", "30d", "all"}, "user": None,
                "action": None, "from": None, "to": None, "event": None},
     # q runs the search on arrival (with ~0.9 / ~0.8 for typos), m=meta searches the catalog metadata
     "/fuzzy-match": {"q": None, "m": {"meta"}}, "/dashboard": {}, "/ai-assistant": {},
-    "/ingestion-lab": {}, "/evidenceflow": {},
+    "/ingestion-lab": {}, "/evidenceflow": {}, "/pipeline-studio": {}, "/about": {}, "/rag/evaluation": {},
 }
 ROUTES = set(ALLOWED_PARAMS)
 

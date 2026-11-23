@@ -64,6 +64,25 @@
   background:rgba(255,255,255,.8);color:var(--g6);font-size:12.5px;min-width:250px;transition:border-color .25s,box-shadow .25s}
 .bdx .search-btn:hover{border-color:rgba(var(--accent-rgb),.4);box-shadow:0 10px 24px -18px rgba(var(--accent-rgb),.6)}
 .bdx .search-btn span{flex:1;text-align:left}
+/* The bar sizes itself, not the window: with the sidebar open there is less
+   room. The page name never folds; the search box turns into an icon first,
+   then the ghost buttons drop their labels, then the buttons wrap to a
+   second row. Only on a phone-sized bar does the name shorten.
+   A running job's pill takes ~160px, so its thresholds sit higher. */
+.bdx .top{container:bdxtop/inline-size;flex-wrap:wrap;row-gap:10px}
+.bdx .top-l{flex:none}
+.bdx .top-r{margin-left:auto}
+@container bdxtop (max-width:1740px){
+  .bdx .search-btn{min-width:0;width:36px;padding:0;justify-content:center}
+  .bdx .search-btn span,.bdx .search-btn kbd{display:none}
+}
+@container bdxtop (max-width:1460px){.bdx .top .btn.ghost .bt{display:none}.bdx .top .btn.ghost{padding:0 10px}}
+@container bdxtop (max-width:600px){.bdx .top-l{flex:0 1 auto;min-width:0}}
+@container bdxtop (max-width:1900px){
+  .bdx .top:has(.runpill) .search-btn{min-width:0;width:36px;padding:0;justify-content:center}
+  .bdx .top:has(.runpill) .search-btn span,.bdx .top:has(.runpill) .search-btn kbd{display:none}
+}
+@container bdxtop (max-width:1620px){.bdx .top:has(.runpill) .btn.ghost .bt{display:none}.bdx .top:has(.runpill) .btn.ghost{padding:0 10px}}
 .bdx kbd{font-family:var(--text);font-size:10.5px;padding:3px 7px;border-radius:6px;border:1px solid var(--g2);background:linear-gradient(#fff,#f7f5f3);box-shadow:0 2px 0 var(--g2);color:var(--g7)}
 .bdx .btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:10px;font-size:12.5px;font-weight:700;white-space:nowrap;
   transition:transform .25s var(--ease),box-shadow .25s,background .25s,filter .25s}
@@ -425,7 +444,7 @@
 .bdx .m-h{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 24px;border-bottom:1px solid var(--g2);background:#fff;border-radius:22px 22px 0 0}
 .bdx .m-h h3{margin:0;font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em}
 .bdx .m-h p{margin:4px 0 0;font-size:12.5px;color:var(--g6)}
-.bdx .m-b{flex:1;overflow:auto;padding:20px 24px}
+.bdx .m-b{flex:1;overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;padding:20px 24px}
 .bdx .m-f{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid var(--g2);background:#fff;border-radius:0 0 22px 22px}
 .bdx .dtable{overflow:auto;max-height:52vh;border:1px solid var(--g2);border-radius:12px;background:#fff}
 .bdx .dtable td{font-size:12px;white-space:nowrap;cursor:default}
@@ -488,8 +507,6 @@
 .bdx .tour-dots i{width:6px;height:6px;border-radius:50%;background:var(--g3);transition:all .3s}
 .bdx .tour-dots i.on{background:var(--accent);width:18px;border-radius:3px}
 @media (max-width:1360px){
-  .bdx .search-btn span{display:none}
-  .bdx .search-btn{min-width:0}
   .bdx .c-trend{display:none}
   .bdx .tool .field.grow{flex-basis:100%}
 }
@@ -500,8 +517,6 @@
   .bdx .hero-in{grid-template-columns:minmax(0,1fr)}
   .bdx .viz-stage{max-width:620px}
   .bdx .fr-top, .bdx .tr-grid, .bdx .su{grid-template-columns:minmax(0,1fr)}
-  .bdx .top .btn.ghost .bt{display:none}
-  .bdx .top .btn.ghost{padding:0 10px}
   .bdx .kpis{grid-template-columns:repeat(6,minmax(0,1fr))}
   .bdx .kpi:nth-child(-n+3){grid-column:span 2}
   .bdx .kpi:nth-child(n+4){grid-column:span 3}
@@ -511,9 +526,6 @@
 @media (max-width:900px){
   .bdx .c-fail, .bdx .c-go, .bdx .c-ds{display:none}
   .bdx .rt{max-width:170px}
-  .bdx .top{flex-wrap:wrap;row-gap:10px}
-  .bdx .cad{order:3;margin:0 auto}
-  .bdx .top-r{margin-left:auto}
 }
 @media (max-width:720px){
   .bdx .crumb{display:none}
@@ -632,7 +644,11 @@
 .bdx .tb-btn .ico{margin-left:auto;color:var(--g6);width:12px;height:12px}
 .bdx .tb{position:relative}
 .bdx .tb-pop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:5;border-radius:14px;background:#fff;border:1px solid var(--line);box-shadow:0 30px 60px -24px rgba(49,44,42,.45);overflow:hidden;animation:bdx-pop .25s var(--ease)}
-.bdx .tb-pop .field{margin:10px;height:34px}
+.bdx .tb-pop .field{margin:10px;height:36px;flex-direction:row;gap:8px;font-size:13px;letter-spacing:0;text-transform:none;font-weight:400;color:var(--g8)}
+.bdx .tb-pop .field input{flex:1;min-width:0;width:auto;height:100%;padding:0;border:0;border-radius:0;background:none;box-shadow:none;font-size:13px}
+/* inside a modal the picker opens in the flow of the form: nothing below is
+   covered and the modal body scrolls to it instead of clipping it */
+.bdx .m-b .tb-pop{position:relative;top:auto;margin-top:6px;box-shadow:0 12px 28px -18px rgba(49,44,42,.35)}
 .bdx .tb-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--g2);height:min(260px,32vh)}
 .bdx .tb-col{overflow:auto;border-right:1px solid var(--g2);padding:6px}
 .bdx .tb-col:last-child{border-right:0}
@@ -692,7 +708,6 @@
 @media (max-width:900px){.bdx .tab{padding:0 12px}}
 .bdx .delta-up,.bdx .delta-dn{white-space:nowrap}
 .bdx .ttl h1,.bdx .ttl .crumb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (max-width:1680px){.bdx .top:has(.runpill) .search-btn span{display:none}.bdx .top:has(.runpill) .search-btn{min-width:0}}
 .bdx .top-l > .icon-btn,.bdx .top-l .mark{flex:none}
 @media (max-width:1360px){.bdx .runpill .rp-t{display:none}.bdx .runpill{padding:0 10px}.bdx .top{gap:12px}.bdx .top-r{gap:6px}}
 .bdx .dtable .t th,.bdx .dtable .t td{border-right:1px solid var(--g3);border-bottom:1px solid var(--g3)}

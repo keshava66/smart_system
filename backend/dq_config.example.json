@@ -304,14 +304,16 @@
       }
     ]
   },
-  "_comment_streamsets": "StreamSets Extractor (Data Studio tab). Browsing uses these credentials directly; extraction runs DQ_IT_Validation/Streamsets/Simplified_extractor.py (script_path defaults to scripts.script_dir/Streamsets/Simplified_extractor.py, python_path to scripts.python_path). That Python needs requests and paramiko. The same username/password are used for SSH to the data collectors.",
+  "_comment_streamsets": "StreamSets Extractor (Data Studio tab). Browsing uses these credentials directly; extraction runs DQ_IT_Validation/Streamsets/Simplified_extractor.py (script_path defaults to scripts.script_dir/Streamsets/Simplified_extractor.py, python_path to scripts.python_path). That Python needs requests and paramiko. The same username/password are used for SSH to the data collectors, so their host keys are checked: list them in ssh_known_hosts (a known_hosts file; the server's own is used when empty) or pin each one in ssh_host_keys as {\"host\": \"SHA256:...\"}. An untrusted key is logged with its fingerprint.",
   "streamsets_extractor": {
     "url": "https://your-controlhub.example.com",
     "username": "",
     "password": "",
-    "verify_ssl": false,
+    "verify_ssl": true,
     "ca_bundle": "",
     "request_timeout": 30,
+    "ssh_known_hosts": "",
+    "ssh_host_keys": {},
     "script_path": "",
     "python_path": "",
     "thread_pool_size": 5,

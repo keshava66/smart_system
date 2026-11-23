@@ -8,6 +8,9 @@ import alertIcon from "/icons/JJ_Icon_Alert_RGB.svg";
 import chevronDownIcon from "/icons/JJ_Icon_Chevron_Down.svg";
 import sfIcon from "/icons/snowflake_badge.svg";
 
+// Stable empty list so memos keyed on the object list don't recompute every render.
+const NO_OBJECTS = [];
+
 const C = {
   line: '#e8e6e3',
   lineSoft: '#f1efed',
@@ -406,7 +409,7 @@ export default function TableCopier({ serverInfo }) {
 
   const sourceSchemas = schemaCache[`read:${form.sourceDatabase}`] || [];
   const targetSchemas = schemaCache[`${targetProfile}:${form.targetDatabase}`] || [];
-  const sourceObjects = tableCache[`read:${form.sourceDatabase}:${form.sourceSchema}`] || [];
+  const sourceObjects = tableCache[`read:${form.sourceDatabase}:${form.sourceSchema}`] || NO_OBJECTS;
   const sourceTables = sourceObjects.map(t => ({
     value: t.name,
     label: t.kind === 'view' ? `${t.name}  (view)`

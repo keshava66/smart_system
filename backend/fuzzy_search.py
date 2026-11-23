@@ -49,7 +49,7 @@ _cfg = {
     "user": None,
     "password": None,
     "base_url": None,
-    "verify": False,
+    "verify": True,
     "connect_timeout": 10,
     "read_timeout": 180,
     "search_limit": 1000000,

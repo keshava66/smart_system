@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { apiFetch } from '../utils/apiClient';
+import { UNSTRUCTURED_TABS, UNSTRUCTURED_SUBTABS } from '../config/permissions';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -12,30 +13,9 @@ const AD_GROUP_ROLES = {
   ...(import.meta.env.VITE_AD_GROUP_IT_VIEWER  && { [import.meta.env.VITE_AD_GROUP_IT_VIEWER]:  'it_viewer'  }),
 };
 
-// One per document-set tab on the Unstructured Explorer (auth.py UNSTRUCTURED_TABS)
-export const UNSTRUCTURED_TABS = {
-  vr: 'viewUnstructuredVR',
-  immbot: 'viewUnstructuredIMMBOT',
-  mirai: 'viewUnstructuredMirAI',
-  rmwcreate: 'viewUnstructuredRMWCreate',
-  haq: 'viewUnstructuredHAQ',
-  nipo: 'viewUnstructuredNipo',
-  rimdocs: 'viewUnstructuredRimDocs',
-  epod: 'viewUnstructuredEPOD',
-  fda: 'viewUnstructuredFDA',
-};
-// Sub-tabs inside each document set (auth.py UNSTRUCTURED_SUBTABS), by doc id then sub-tab id
-export const UNSTRUCTURED_SUBTABS = {
-  vr: { internal: 'viewUnstructuredVRInternal', external: 'viewUnstructuredVRExternal', cortellis: 'viewUnstructuredVRCortellis' },
-  immbot: { explore: 'viewUnstructuredIMMBOTExplore', table: 'viewUnstructuredIMMBOTTable', breakdown: 'viewUnstructuredIMMBOTBreakdown' },
-  rimdocs: { overview: 'viewUnstructuredRimDocsExplore', table: 'viewUnstructuredRimDocsTable', breakdown: 'viewUnstructuredRimDocsBreakdown' },
-  epod: { explore: 'viewUnstructuredEPODExplore', table: 'viewUnstructuredEPODTable' },
-  nipo: { explore: 'viewUnstructuredNipoExplore', table: 'viewUnstructuredNipoTable' },
-  fda: { explore: 'viewUnstructuredFDAExplore', table: 'viewUnstructuredFDATable' },
-};
 // parent -> children added after roles were first saved, parents first (auth.py UNSTRUCTURED_GROUPS)
 // Snowflake sub permissions (auth.py SNOWFLAKE_SUBPERMS). Older roles get them off, admin gets them on
-export const SNOWFLAKE_SUBPERMS = ['useAllSnowflakeRoles', 'writeSnowflake', 'copySnowflakeTables'];
+const SNOWFLAKE_SUBPERMS = ['useAllSnowflakeRoles', 'writeSnowflake', 'copySnowflakeTables'];
 const sfPerms = (on) => Object.fromEntries(SNOWFLAKE_SUBPERMS.map(k => [k, on]));
 const TAB_GROUPS = [
   ['viewUnstructured', Object.values(UNSTRUCTURED_TABS)],

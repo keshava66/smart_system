@@ -73,6 +73,9 @@ const ROUTE_ALIASES = {
   '/dashboard': ['home', 'landing'],
   '/dqe': ['data-quality', 'dataquality', 'quality', 'checks', 'it-checks', 'business-checks', 'rules'],
   '/rag': ['rags', 'knowledge-base', 'knowledge-bases'],
+  '/rag/evaluation': ['rag-evaluation', 'evaluation', 'rag-eval'],
+  '/pipeline-studio': ['pipeline-studio', 'pipelines', 'pipeline-validation'],
+  '/about': ['about-us', 'about-smarthub'],
   '/fuzzy-match': ['fuzzy', 'fuzzymatch', 'matching'],
   '/ingestion-lab': ['ingestion', 'ingestion-lab'],
   '/evidenceflow': ['evidenceflow', 'evidence-flow', 'evidence'],
@@ -178,7 +181,8 @@ async function highlight({ target, targets, region, note } = {}) {
   document.querySelectorAll('[data-assistant-hl]').forEach((n) => n.remove());
 
   // resolve the rect(s) to spotlight
-  let rects = [], firstEl = null;
+  let rects;
+  let firstEl = null;
   if (region && region.w && region.h) {
     rects = [{ left: region.x, top: region.y, width: region.w, height: region.h }];
   } else {
@@ -392,11 +396,9 @@ function ensureTourStyle() {
 .jjt-next{background:#eb1700;color:#fff;box-shadow:0 2px 8px rgba(235,23,0,.30)}
 .jjt-next:hover{background:#d11400}
 .jjt-next:active{transform:translateY(1px);box-shadow:0 1px 4px rgba(235,23,0,.30)}
-@media (prefers-reduced-motion:no-preference){
- .jjt-card{animation:jjt-in .22s cubic-bezier(.16,1,.3,1) both}
- .jjt-caret{animation:jjt-fade .22s ease both}
- .jjt-ring{animation:jjt-pulse 1.9s ease-in-out infinite}
-}
+html:not(.reduce-motion) .jjt-card { animation:jjt-in .22s cubic-bezier(.16,1,.3,1) both }
+html:not(.reduce-motion) .jjt-caret { animation:jjt-fade .22s ease both }
+html:not(.reduce-motion) .jjt-ring { animation:jjt-pulse 1.9s ease-in-out infinite }
 @keyframes jjt-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes jjt-fade{from{opacity:0}to{opacity:1}}
 @keyframes jjt-pulse{0%,100%{stroke-width:2px;opacity:1}50%{stroke-width:3px;opacity:.7}}
@@ -520,7 +522,7 @@ async function doAction({ action_id, target, action, value } = {}) {
   const a = walked ? avatar() : null;
   if (a) { a.classList.add('assistant-acting'); await wait(140); } // reach out
 
-  let tag = el.tagName.toLowerCase();
+  const tag = el.tagName.toLowerCase();
   // pick the verb: explicit `action`, else infer from value + element type
   let verb = (action || '').toLowerCase();
   if (!verb) verb = (value != null && value !== '' && (tag === 'input' || tag === 'textarea' || el.isContentEditable)) ? 'type'
@@ -539,7 +541,6 @@ async function doAction({ action_id, target, action, value } = {}) {
     const retry = findFormControl(rawTarget);
     if (retry && retry !== el) {
       el = retry;
-      tag = el.tagName.toLowerCase();
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await wait(200);
     } else {
@@ -568,7 +569,6 @@ async function doAction({ action_id, target, action, value } = {}) {
       return false;
     }
     el = fresh;
-    tag = el.tagName.toLowerCase();
   }
 
   // Whatever happens inside the native DOM interaction below — including a
@@ -644,7 +644,7 @@ function findEl(target) {
   for (const sel of tries) { const el = document.querySelector(sel); if (el) return el; }
 
   // looks like a CSS selector? try it directly
-  if (/[#.[>: ]/.test(t)) { try { const el = document.querySelector(t); if (el) return el; } catch {} }
+  if (/[#.[>: ]/.test(t)) { try { const el = document.querySelector(t); if (el) return el; } catch { /* not a valid selector; fall through */ } }
 
   // otherwise treat it as visible text — prefer the smallest exact match, then a contains
   return byText(t);

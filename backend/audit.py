@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional, List, Dict
 
-from fastapi import APIRouter, Query, Header, HTTPException, Depends, Request
+from fastapi import APIRouter, Query, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -607,7 +607,6 @@ def get_audit_logs(
     auth: dict = Depends(require_permission("viewAudit")),
 ):
     """Return paginated, filtered audit log entries (newest first)."""
-    x_user_email = auth["user"]["email"]
     where, params = _build_where(search, action, performed_by, date_from, date_to, category, range_key)
 
     offset = (page - 1) * page_size
@@ -1504,6 +1503,44 @@ def put_assistant_settings(
         "auto_send_voice": bool(row["auto_send_voice"]),
     }
     return {"success": True, "settings": merged}
+
+
+# ---------------------------------------------------------------- preferences
+# Portal-wide user preferences, open to every signed-in user. "Reduce motion"
+# is the only one: the account menu sets it and it governs every animation in
+# the portal, whatever the operating system says (Windows Cloud PCs report
+# "reduce motion" by default). It lives in assistant_settings.reduce_motion,
+# where the assistant's own toggle used to keep it, so earlier choices carry over.
+
+class PreferencesRequest(BaseModel):
+    reduce_motion: bool
+
+
+@audit_router.get("/preferences")
+def get_preferences(auth: dict = Depends(require_auth)):
+    with _db(read_only=True) as conn:
+        row = conn.execute("SELECT reduce_motion FROM assistant_settings WHERE user_email = ?",
+                           (auth["user"]["email"],)).fetchone()
+    return {"preferences": {"reduce_motion": bool(row["reduce_motion"]) if row else False}}
+
+
+@audit_router.put("/preferences")
+def put_preferences(prefs: PreferencesRequest, auth: dict = Depends(require_auth)):
+    # Touches only reduce_motion: a new row takes the assistant's defaults
+    # (assistant off), an existing row keeps its assistant settings.
+    with _db(autocommit=True) as conn:
+        row = conn.execute(
+            """
+            INSERT INTO assistant_settings AS s (user_email, reduce_motion, updated_at)
+            VALUES (:email, :reduce_motion, :now)
+            ON CONFLICT (user_email) DO UPDATE SET
+                reduce_motion = EXCLUDED.reduce_motion,
+                updated_at    = EXCLUDED.updated_at
+            RETURNING reduce_motion
+            """,
+            {"email": auth["user"]["email"], "reduce_motion": prefs.reduce_motion, "now": datetime.now(EASTERN)},
+        ).fetchone()
+    return {"success": True, "preferences": {"reduce_motion": bool(row["reduce_motion"])}}
 
 # ============================================================================
 # SAFETY NET: every authenticated write to the API is recorded

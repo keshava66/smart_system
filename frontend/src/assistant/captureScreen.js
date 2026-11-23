@@ -31,7 +31,7 @@ export function resolveRef(r) {
   const hit = REGISTRY.get(r);
   if (!hit) return null;
   if (hit.el && hit.el.isConnected) return hit.el;     // still the same live node
-  if (hit.sel) { try { return document.querySelector(hit.sel); } catch {} } // re-find by path
+  if (hit.sel) { try { return document.querySelector(hit.sel); } catch { /* stale selector */ } } // re-find by path
   return null;
 }
 

@@ -69,9 +69,9 @@ def frontend_values():
             set(re.findall(r"id:\s*'([a-z0-9_]+)'", block(un, r"const FDA_DASHBOARDS\s*=\s*\["))),
         ("/data-api", "tab"): set(re.findall(r"\['([a-z]+)',", block(api_lib, r"export const TABS\s*=\s*\[", end="];"))),
         ("/data-api", "new"): {"1"} if "sp.get('new') === '1'" in api else set(),
-        ("/audit", "view"): {"analytics", "stream"} if "params.get('view') === 'analytics'" in audit else set(),
+        ("/audit", "view"): ids_in(block(audit, r"const VIEWS\s*=\s*\[")),
         ("/audit", "cat"): ids_in(block(audit, r"const CAT_NAMES\s*=\s*\[")) | {"all"},
-        ("/audit", "range"): ids_in(block(audit, r"\['24h'", end="]")) | {"24h"},
+        ("/audit", "range"): ids_in(block(audit, r"const RANGES\s*=\s*\[")),
         ("/gra-data-domains", "view"): {"directory"} if "params.get('view') === 'directory'" in gra else set(),
         ("/gra-data-domains", "tab"): {"records", "people"} if "params.get('tab') === 'records'" in gra else set(),
     }
@@ -109,7 +109,7 @@ def test_free_text_params_are_read():
             if values is not None:
                 continue
             text = "".join(src(f) for f in PAGE_FILES[route])
-            assert re.search(r"\.get\('" + k + r"'\)", text), f"{route} never reads ?{k}"
+            assert re.search(r"(\.get|\bdate)\('" + k + r"'\)", text), f"{route} never reads ?{k}"
 
 
 def test_allowed_params_match_frontend():
@@ -121,13 +121,13 @@ def test_allowed_params_match_frontend():
 
 def test_routes_match_app_jsx():
     app = src("App.jsx")
-    paths = set(re.findall(r'path="(/[a-z0-9-]+)"', app)) - {"/login", "/logout", "/audit-edit", "/audit-edit-force"}
+    paths = set(re.findall(r'path="(/[a-z0-9/-]+)"', app)) - {"/login", "/logout", "/audit-edit", "/audit-edit-force"}
     assert paths == pm.ROUTES
 
 
 def test_route_permissions_match_app_jsx():
     app = src("App.jsx")
-    for path, perm in re.findall(r'path="(/[a-z0-9-]+)"\s*element=\{\s*<PermissionRoute permission="(\w+)"', app):
+    for path, perm in re.findall(r'path="(/[a-z0-9/-]+)"\s*element=\{\s*<PermissionRoute permission="(\w+)"', app):
         if path.startswith("/audit-edit"):
             continue
         root = next(x for x in pm.DESTINATIONS.values() if x.route == path and x.parent is None)
@@ -170,6 +170,8 @@ def test_sidebar_and_dashboard_links_all_resolve():
 
 
 LABEL_EXCEPTIONS = {"dqe.dv", "un.haq"}  # labels built with escapes/unicode in the source
+# Audit filtered views: named for the filter the URL applies, not for an on-screen label
+LABEL_EXCEPTIONS |= {"audit.security", "audit.access", "audit.admin", "audit.rules"}
 
 
 @pytest.mark.parametrize("dest_id", sorted(pm.DESTINATIONS))
@@ -222,7 +224,7 @@ def test_describe_url_round_trips():
 def test_frontend_route_aliases_cover_every_route():
     js = src("assistant/assistantActions.js")
     table = block(js, r"const ROUTE_ALIASES\s*=\s*\{", end="};")
-    assert set(re.findall(r"'(/[a-z0-9-]+)'\s*:", table)) == pm.ROUTES
+    assert set(re.findall(r"'(/[a-z0-9/-]+)'\s*:", table)) == pm.ROUTES
 
 
 def test_no_alias_repeats_an_ancestors_alias():

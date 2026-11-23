@@ -27,7 +27,8 @@ const preloadDocType = (id) => (EXPLORERS_BY_DOC_TYPE[id] || []).forEach(c => c.
 const ExplorerLoading = () => (
   <div className="flex-1 min-h-0 flex items-center justify-center"><LoadingSpinner /></div>
 );
-import { useRBAC, UNSTRUCTURED_TABS, UNSTRUCTURED_SUBTABS } from '../context/RBACContext';
+import { useRBAC } from '../context/RBACContext';
+import { UNSTRUCTURED_TABS, UNSTRUCTURED_SUBTABS } from '../config/permissions';
 import { useAuth } from '../context/AuthContext';
 import { logAuditEvent } from '../utils/auditLog';
 
@@ -50,58 +51,8 @@ import leaderIcon from "/icons/JJ_Icon_Leader_RGB.svg";
 import aiIcon from "/icons/JJ_Icon_AI_RGB.svg";
 import editIcon from "/icons/JJ_Icon_Edit_RGB.svg";
 import { apiFetch, apiJson, downloadFile } from '../utils/apiClient';
+import SearchSection from '../components/SearchSection';
 
-// Collapsible "Search fields" block for the filter rail. Starts closed (open if a
-// search is already filled in) so the text boxes don't push the facets off
-// screen. Inputs stay mounted while closed, so typed values are kept.
-function SearchSection({ children, label = 'Search fields', hint = 'Type in any box to find records where that field contains your text. Boxes combine, so every filled box has to match. Results update a moment after you stop typing.' }) {
-  const bodyRef = useRef(null);
-  const [active, setActive] = useState(0);
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    const el = bodyRef.current;
-    if (!el) return;
-    const n = [...el.querySelectorAll('input')].filter(i => i.value.trim()).length;
-    if (n !== active) setActive(n);
-  });
-  // Opens by itself once if it mounts with a search already typed in (e.g. the
-  // filter rail was collapsed and reopened). The count above lands after the
-  // first render, so this has to follow it rather than run once on mount.
-  const autoOpened = useRef(false);
-  useEffect(() => {
-    if (active > 0 && !autoOpened.current) { autoOpened.current = true; setOpen(true); }
-  }, [active]);
-  return (
-    <div className="border-b border-jj-gray-01 flex-shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-        title={hint}
-        className="w-full flex items-center justify-between px-[18px] py-3.5 text-left hover:bg-jj-gray-01/50 transition-colors"
-      >
-        <span className="flex items-center gap-2 text-[11px] font-johnson-text font-bold uppercase tracking-wider text-jj-gray-07">
-          <svg viewBox="0 0 16 16" className="w-[13px] h-[13px] flex-shrink-0 text-jj-gray-06" aria-hidden="true">
-            <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
-            <path d="m10.4 10.4 3.4 3.4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          {label}
-          {active > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full bg-jj-red text-white text-[10px] font-medium normal-case tracking-normal">
-              {active}
-            </span>
-          )}
-        </span>
-        <svg viewBox="0 0 10 10" className={`w-2.5 h-2.5 flex-shrink-0 text-jj-gray-06 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true">
-          <path d="M3.5 2 6.5 5 3.5 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      <div ref={bodyRef} className={open ? 'px-[18px] pb-3.5 space-y-2 max-h-[45vh] overflow-y-auto' : 'hidden'}>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 
 // Column keys -> readable labels in detail panels ("first_created_at" -> "First created at").
@@ -2348,8 +2299,10 @@ export default function Unstructured() {
     ...(debouncedArtifactName ? { search_artifact_name: debouncedArtifactName } : {}),
     ...(debouncedJjNumber ? { search_jj_number: debouncedJjNumber } : {}),
   }), [filtersParam, debouncedFileName, debouncedObjectName, debouncedJjTitle, debouncedArtifactName, debouncedJjNumber]);
-  const { STATUS: _selfStatusFilter, ...filtersWithoutStatus } = filters;
-  const ingestionStatusFacetParam = useMemo(() => encodeFilters(filtersWithoutStatus), [filters]);
+  const ingestionStatusFacetParam = useMemo(() => {
+    const { STATUS: _selfStatusFilter, ...filtersWithoutStatus } = filters;
+    return encodeFilters(filtersWithoutStatus);
+  }, [filters]);
   const ingestionStatusFacetParams = useMemo(() => new URLSearchParams({
     ...(ingestionStatusFacetParam ? { filters: ingestionStatusFacetParam } : {}),
     ...(debouncedFileName ? { search_file_name: debouncedFileName } : {}),
@@ -2391,7 +2344,7 @@ export default function Unstructured() {
     if (searchArtifactName) chips.push({ key: 'sa', text: `ARTIFACT_NAME: "${searchArtifactName}"`, onRemove: () => setSearchArtifactName('') });
     if (searchJjNumber) chips.push({ key: 'sn', text: `JJ_NUMBER: "${searchJjNumber}"`, onRemove: () => setSearchJjNumber('') });
     return chips;
-  }, [filters, searchFileName, searchObjectName, searchJjTitle, searchArtifactName, searchJjNumber]);
+  }, [filters, searchFileName, searchObjectName, searchJjTitle, searchArtifactName, searchJjNumber, logInPage]);
 
   // Fetch one page of rows for an explicit page number - never reads `page`
   // state internally so callers control exactly which page gets requested
@@ -2598,7 +2551,7 @@ export default function Unstructured() {
 
   useEffect(() => {
     loadDocsOverTime();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [loadDocsOverTime]);
 
   // Domain -> Therapeutic area -> Artifact drill-down. Always the full table,

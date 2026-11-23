@@ -179,7 +179,7 @@ def log_detailed_error(context: str, error: Exception, additional_info: Dict = N
     print_safe(f"Error: {str(error)}")
 
     if additional_info:
-        print_safe(f"\nDetails:")
+        print_safe("\nDetails:")
         for key, value in additional_info.items():
             print_safe(f"  • {key}: {value}")
 
@@ -510,12 +510,12 @@ class ConfigLoader:
                             self.transformation_rules = transformations
 
                             # Show what transformations will be applied
-                            print_safe(f"  🔍 Detected Field Mapper transformation:")
+                            print_safe("  🔍 Detected Field Mapper transformation:")
                             for pattern, replacement in transformations:
                                 repl_display = repr(replacement) if replacement else "''"
                                 print_safe(f"     • Pattern: {pattern} → Replacement: {repl_display}")
                             return
-        except Exception as e:
+        except Exception:
             # Silently fail - if we can't detect, we assume no transformation
             pass
 
@@ -841,7 +841,7 @@ class ConnectionPool:
                             return conn
                         else:
                             log_detailed_error(
-                                f"Connection Pool - Failed to connect",
+                                "Connection Pool - Failed to connect",
                                 Exception("Connection attempt returned False"),
                                 {
                                     "Connector": self.connector_class.__name__,
@@ -852,7 +852,7 @@ class ConnectionPool:
                             return None
                     except Exception as e:
                         log_detailed_error(
-                            f"Connection Pool - Exception during connection",
+                            "Connection Pool - Exception during connection",
                             e,
                             {
                                 "Connector": self.connector_class.__name__,
@@ -1101,12 +1101,12 @@ class OracleConnector(DeadlineMixin):
         if self.deadline is not None and time.monotonic() >= self.deadline:
             raise TableTimeout('Table time limit reached')  # don't reconnect for a table that's given up
         if not self.is_alive():
-            print_safe(f"      ⚠️  Oracle connection lost, reconnecting...")
+            print_safe("      ⚠️  Oracle connection lost, reconnecting...")
             if self.reconnect():
-                print_safe(f"      ✓ Oracle reconnected successfully")
+                print_safe("      ✓ Oracle reconnected successfully")
                 return True
             else:
-                print_safe(f"      ✗ Oracle reconnection failed")
+                print_safe("      ✗ Oracle reconnection failed")
                 return False
         return True
 
@@ -1132,7 +1132,7 @@ class OracleConnector(DeadlineMixin):
                         raise Exception("Failed to establish Oracle connection after retries")
 
                 cursor = self.conn.cursor()
-                query = f"""
+                query = """
                     SELECT column_name, data_type, nullable
                     FROM all_tab_columns
                     WHERE table_name = :table_name
@@ -1153,7 +1153,7 @@ class OracleConnector(DeadlineMixin):
                 if not columns:
                     error_msg = f"Table {table_name} not found in schema {self.schema}"
                     log_detailed_error(
-                        f"Oracle - Table Not Found",
+                        "Oracle - Table Not Found",
                         Exception(error_msg),
                         {
                             "Table": table_name,
@@ -1244,7 +1244,7 @@ class OracleConnector(DeadlineMixin):
                         raise Exception("Failed to establish Oracle connection after retries")
 
                 cursor = self.conn.cursor()
-                cursor.execute(f"SELECT table_name FROM all_tables WHERE owner = :schema ORDER BY table_name",
+                cursor.execute("SELECT table_name FROM all_tables WHERE owner = :schema ORDER BY table_name",
                                {'schema': self.schema.upper()})
                 tables = [row[0] for row in cursor.fetchall()]
                 cursor.close()
@@ -1501,12 +1501,12 @@ class SnowflakeConnector(DeadlineMixin):
         if self.deadline is not None and time.monotonic() >= self.deadline:
             raise TableTimeout('Table time limit reached')  # don't reconnect for a table that's given up
         if not self.is_alive():
-            print_safe(f"      ⚠️  Snowflake connection lost, reconnecting...")
+            print_safe("      ⚠️  Snowflake connection lost, reconnecting...")
             if self.reconnect():
-                print_safe(f"      ✓ Snowflake reconnected successfully")
+                print_safe("      ✓ Snowflake reconnected successfully")
                 return True
             else:
-                print_safe(f"      ✗ Snowflake reconnection failed")
+                print_safe("      ✗ Snowflake reconnection failed")
                 return False
         return True
 
@@ -2612,7 +2612,7 @@ class DataValidator:
 
         if self.format_type == 'query_based':
             # For query-based, we only have one "table" to validate
-            print_safe(f"\n  ⏳ Validating query-based data...")
+            print_safe("\n  ⏳ Validating query-based data...")
             result = self._validate_single_table_with_timeout("QUERY_RESULT", timeout=self.table_timeout)
 
             if result['status'] == 'TIMEOUT':
@@ -2627,7 +2627,7 @@ class DataValidator:
                         result = self._validate_single_table_with_timeout("QUERY_RESULT", timeout=self.table_timeout)
 
                         if result['status'] == 'TIMEOUT':
-                            print_safe(f"       ⏱️  Still timing out...")
+                            print_safe("       ⏱️  Still timing out...")
                         else:
                             status_icon = "✅" if result['status'] == 'PASSED' else "🚨" if result[
                                                                                               'status'] == 'CRITICAL' else "🟡" if result['status'] == 'WARNING' else "⚠️"
@@ -2651,7 +2651,7 @@ class DataValidator:
                             })
 
             elif result['status'] == 'TABLE_NOT_FOUND':
-                print_safe(f"    ⊘  Target table does not exist in Snowflake")
+                print_safe("    ⊘  Target table does not exist in Snowflake")
             else:
                 status_icon = "✅" if result['status'] == 'PASSED' else "🚨" if result['status'] == 'CRITICAL' else "🟡" if result['status'] == 'WARNING' else "⚠️"
                 print_safe(f"    {status_icon} Query validation - {result['status']}")
@@ -2872,7 +2872,7 @@ class DataValidator:
                 'Snowflake_Last_Updated': None,
                 'Last_Checked': datetime.now(EASTERN).isoformat()
             }
-        except Exception as e:
+        except Exception:
             # Other exception - shutdown normally
             executor.shutdown(wait=True)
             raise
@@ -2987,7 +2987,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
                         "Oracle Schema Present": bool(oracle_schema)
                     }
                 )
-                print_safe(f"  ❌ Missing query-based configuration")
+                print_safe("  ❌ Missing query-based configuration")
                 return {
                     'pipeline_name': pipeline_name,
                     'pipeline_number': pipeline_number,
@@ -3017,7 +3017,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
                         "Snowflake Database Present": bool(sf_database_from_report)
                     }
                 )
-                print_safe(f"  ❌ Missing table-list configuration")
+                print_safe("  ❌ Missing table-list configuration")
                 return {
                     'pipeline_name': pipeline_name,
                     'pipeline_number': pipeline_number,
@@ -3068,7 +3068,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
                 excluded_columns = [col.strip().upper() for col in excluded_cols.split(',') if col.strip()]
 
         # Create connection pools
-        print_safe(f"  📊 Configuration:")
+        print_safe("  📊 Configuration:")
         print_safe(f"     Oracle Schema: {oracle_schema}")
         print_safe(f"     Snowflake: {sf_database}.{sf_schema}")
         print_safe(f"     Roles: {', '.join(sf_roles)}")
@@ -3076,7 +3076,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
         print_safe(f"     Tables: {len(tables) if tables else ('N/A (query-based)' if format_type == 'query_based' else 'all in the schema (read from Oracle)')}")
         print_safe(f"     Timeout: {table_timeout}s per table")
         if field_name_transformation:
-            print_safe(f"     Column Name Transformation: ENABLED")
+            print_safe("     Column Name Transformation: ENABLED")
 
         oracle_pool = ConnectionPool(
             OracleConnector,
@@ -3122,11 +3122,11 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
         # Use try-finally to ensure cleanup happens no matter what
         try:
             # Test connections
-            print_safe(f"  🔌 Testing connections...")
+            print_safe("  🔌 Testing connections...")
             oracle_test = oracle_pool.get_connection()
             if not oracle_test:
                 error_msg = 'Failed to establish Oracle connection - see detailed error log above'
-                print_safe(f"  ❌ Failed to connect to Oracle")
+                print_safe("  ❌ Failed to connect to Oracle")
                 return {
                     'pipeline_name': pipeline_name,
                     'pipeline_number': pipeline_number,
@@ -3139,7 +3139,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
             sf_test = snowflake_pool_manager.get_connection()
             if not sf_test:
                 error_msg = 'Failed to establish Snowflake connection - see detailed error log above'
-                print_safe(f"  ❌ Failed to connect to Snowflake")
+                print_safe("  ❌ Failed to connect to Snowflake")
                 return {
                     'pipeline_name': pipeline_name,
                     'pipeline_number': pipeline_number,
@@ -3154,13 +3154,13 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
             else:
                 snowflake_pool_manager.return_connection(sf_test)
 
-            print_safe(f"  ✅ Connections established")
+            print_safe("  ✅ Connections established")
 
             # Handle table list logic
             if format_type == 'table_list':
                 should_fetch_all_tables = (not tables and getattr(config_loader, 'table_pattern', '') == '%')
                 if should_fetch_all_tables:
-                    print_safe(f"  🔍 Fetching all tables from Oracle...")
+                    print_safe("  🔍 Fetching all tables from Oracle...")
                     oracle_conn = oracle_pool.get_connection()
                     tables = oracle_conn.get_all_tables()
                     oracle_pool.return_connection(oracle_conn)
@@ -3176,7 +3176,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
                                 "Reason": "Schema exists but contains no tables, or user lacks permission to view tables"
                             }
                         )
-                        print_safe(f"  ❌ No tables found in Oracle schema")
+                        print_safe("  ❌ No tables found in Oracle schema")
                         return {
                             'pipeline_name': pipeline_name,
                             'pipeline_number': pipeline_number,
@@ -3224,7 +3224,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
             # Get results
             validation_results = validator.get_results()
 
-            print_safe(f"  ✅ Pipeline validation completed")
+            print_safe("  ✅ Pipeline validation completed")
 
             return {
                 'pipeline_name': pipeline_name,
@@ -3239,7 +3239,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
 
         finally:
             # CRITICAL: Always cleanup connection pools, even on exception
-            print_safe(f"  🧹 Cleaning up connection pools...")
+            print_safe("  🧹 Cleaning up connection pools...")
 
             # Check if we need to skip disconnect (due to abandoned threads)
             skip_disconnect = False
@@ -3249,7 +3249,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
                     skip_disconnect = validator.has_abandoned_threads
                     if skip_disconnect:
                         print_safe(
-                            f"  ⚠️  Abandoned threads detected - will skip connection disconnect to avoid hanging")
+                            "  ⚠️  Abandoned threads detected - will skip connection disconnect to avoid hanging")
             except:
                 pass
 
@@ -3271,7 +3271,7 @@ def validate_single_pipeline(pipeline_data: Dict, config: Dict, pipeline_index: 
                 "Pipeline": pipeline_name
             }
         )
-        print_safe(f"  ❌ Pipeline validation failed - see detailed error log above")
+        print_safe("  ❌ Pipeline validation failed - see detailed error log above")
         return {
             'pipeline_name': pipeline_name,
             'pipeline_number': pipeline_number,
@@ -3436,12 +3436,12 @@ def main():
     # Print overall summary
     print_header("OVERALL VALIDATION SUMMARY", "=", 80)
 
-    print_safe(f"\n📋 PIPELINES:")
+    print_safe("\n📋 PIPELINES:")
     print_safe(f"   Total: {consolidated_report['report_metadata']['total_pipelines']}")
     print_safe(f"   ✅ Successful: {consolidated_report['overall_summary']['successful_pipelines']}")
     print_safe(f"   ❌ Failed: {consolidated_report['overall_summary']['failed_pipelines']}")
 
-    print_safe(f"\n📊 TABLES:")
+    print_safe("\n📊 TABLES:")
     print_safe(f"   Total Validated: {consolidated_report['overall_summary']['total_tables_validated']}")
     print_safe(f"   ✅ Passed: {consolidated_report['overall_summary']['total_passed']}")
     print_safe(f"   🚨 Critical: {consolidated_report['overall_summary']['total_critical']}")

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiJson } from '../../utils/apiClient';
-import { CLS, Icon, Modal } from './CommunicationParts';
+import { Icon, Modal } from './CommunicationParts';
+import { CLS } from './communicationLib';
 
 import aiIcon from "/icons/JJ_Icon_AI_RGB.svg";
 
 /* What the quick buttons under the Message heading do. "write" and the
    what's-new one are the big two and live on their own buttons. */
-export const REWORK = [
+const REWORK = [
   ['rewrite',  'Rewrite'],
   ['shorten',  'Shorten'],
   ['expand',   'Expand'],

@@ -3,7 +3,8 @@ import { ArrowRight, ChevronDown, ChevronRight, Copy, ExternalLink, Plus, X } fr
 import { apiFetch } from '../../utils/apiClient';
 import { tableUiUrl } from './dataApiDocs';
 import { API_BASE_URL, bytes, copyText, FILTER_OPS, KEY_PLACEHOLDER, NO_VALUE_OPS, request, usePage, useResource, useToast } from './lib';
-import { highlightCode, InlineError, JsonView, Seg, Select, Spinner } from './ui';
+import { InlineError, JsonView, Seg, Select, Spinner } from './ui';
+import { highlightCode } from './highlight';
 
 const enc = encodeURIComponent;
 const COPY_FAIL = "Couldn't copy. Your browser blocked the clipboard.";

@@ -84,7 +84,6 @@ export const useProfilePhoto = (user, onSessionExpired) => {
               silentError.errorCode === 'interaction_required' ||
               silentError.message?.includes('AADSTS')) {
 
-            console.log('Silent token acquisition failed, trying interactive login...');
 
             try {
               // Try interactive token acquisition
@@ -103,7 +102,7 @@ export const useProfilePhoto = (user, onSessionExpired) => {
               }
 
               token = interactiveResponse.accessToken;
-            } catch (interactiveError) {
+            } catch {
               // Interactive login failed - session is truly invalid
               console.warn('Session expired - user authentication required');
               if (onSessionExpired) {
@@ -171,7 +170,7 @@ export const useProfilePhoto = (user, onSessionExpired) => {
     };
 
     fetchProfilePhoto();
-  }, [user?.username, accounts.length, instance, onSessionExpired]); // Use stable primitive values
+  }, [user?.username, accounts.length, instance, onSessionExpired]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on stable primitives; MSAL hands back a new accounts array on every auth event
 
   return { profilePhoto, photoLoading };
 };

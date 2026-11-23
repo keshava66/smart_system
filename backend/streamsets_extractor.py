@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import importlib.util
 import json
 import logging
@@ -106,7 +108,7 @@ def _settings() -> Dict[str, Any]:
         "url": cfg["url"].strip().rstrip("/"),
         "username": cfg["username"],
         "password": cfg["password"],
-        "verify": cfg.get("ca_bundle") or bool(cfg.get("verify_ssl", False)),
+        "verify": cfg.get("ca_bundle") or bool(cfg.get("verify_ssl", True)),
         "timeout": int(cfg.get("request_timeout") or 30),
         "script_path": script,
         "python_path": cfg.get("python_path") or _scripts.get("python_path") or sys.executable,
@@ -598,6 +600,55 @@ def _sdc_hosts() -> List[str]:
     return hosts
 
 
+def _host_fingerprint(key) -> str:
+    """OpenSSH-style SHA256 fingerprint, as ssh-keygen -lf prints it."""
+    return "SHA256:" + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode().rstrip("=")
+
+
+def _ssh_client(raw: Dict[str, Any]):
+    """SSH client that only talks to trusted Data Collectors. The password goes to
+    whoever answers, so a spoofed host must not get it. Trust comes from known_hosts
+    (ssh_known_hosts in the config, else the system's) or a fingerprint pinned per
+    host in ssh_host_keys; anything else is refused and logged with its fingerprint."""
+    import paramiko
+    pinned = raw.get("ssh_host_keys") or {}
+
+    class _Pinned(paramiko.MissingHostKeyPolicy):
+        def missing_host_key(self, client, hostname, key):
+            fp = _host_fingerprint(key)
+            if pinned.get(hostname) == fp:
+                client.get_host_keys().add(hostname, key.get_name(), key)
+                return
+            logger.warning("StreamSets Data Collector %s has an untrusted host key %s - add it to "
+                           "ssh_host_keys in the streamsets config, or to known_hosts", hostname, fp)
+            raise paramiko.SSHException(f"untrusted host key {fp}")
+
+    ssh = paramiko.SSHClient()
+    try:
+        known_hosts = raw.get("ssh_known_hosts")
+        if known_hosts:
+            ssh.load_host_keys(os.path.expanduser(known_hosts))
+        else:
+            ssh.load_system_host_keys()
+    except OSError:
+        pass
+    ssh.set_missing_host_key_policy(_Pinned())
+    return ssh
+
+
+def _script_env(cfg: Dict[str, Any], raw: Dict[str, Any], workdir: str) -> Dict[str, str]:
+    """Environment for the extractor script: credentials plus the same TLS and SSH trust as the portal."""
+    verify = cfg["verify"]
+    return {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8",
+            "STREAMSETS_URL": cfg["url"], "STREAMSETS_USERNAME": cfg["username"],
+            "STREAMSETS_PASSWORD": cfg["password"], "STREAMSETS_OUTPUT_DIR": workdir,
+            "STREAMSETS_REQUEST_TIMEOUT": str(cfg["timeout"]),
+            "STREAMSETS_THREAD_POOL_SIZE": str(cfg["thread_pool_size"]),
+            "STREAMSETS_VERIFY": str(verify).lower() if isinstance(verify, bool) else str(verify),
+            "STREAMSETS_SSH_KNOWN_HOSTS": raw.get("ssh_known_hosts") or "",
+            "STREAMSETS_SSH_HOST_KEYS": json.dumps(raw.get("ssh_host_keys") or {})}
+
+
 def _read_resource(path: str):
     """Same approach as Final_pipeline_extractor.py: SFTP to each Data Collector until one has the file."""
     try:
@@ -612,8 +663,7 @@ def _read_resource(path: str):
     tried = []
     for host in _sdc_hosts():
         tried.append(host)
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())   # as the extractor script does
+        ssh = _ssh_client(raw)
         try:
             ssh.connect(host, port, user, password, timeout=10, banner_timeout=10, auth_timeout=10,
                         allow_agent=False, look_for_keys=False)
@@ -791,11 +841,7 @@ async def extract(
             logger.info("StreamSets extraction by %s: %s", user, ", ".join(names.values()))
             yield _sse({"type": "status", "message": f"Starting extraction of {len(ids)} pipeline(s)",
                         "pipelines": [{"id": i, "name": names[i]} for i in ids]})
-            env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8",
-                   "STREAMSETS_URL": cfg["url"], "STREAMSETS_USERNAME": cfg["username"],
-                   "STREAMSETS_PASSWORD": cfg["password"], "STREAMSETS_OUTPUT_DIR": workdir,
-                   "STREAMSETS_REQUEST_TIMEOUT": str(cfg["timeout"]),
-                   "STREAMSETS_THREAD_POOL_SIZE": str(cfg["thread_pool_size"])}
+            env = _script_env(cfg, _config or {}, workdir)
             # Popen + a reader thread rather than asyncio subprocesses: those don't work on
             # Windows' SelectorEventLoop (uvicorn --reload) - same reason as the IT validation runner.
             process = subprocess.Popen([cfg["python_path"], cfg["script_path"], "--pipeline", *ids, "--output", output],

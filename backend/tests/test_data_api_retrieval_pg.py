@@ -12,6 +12,7 @@ SQL, activity log) is the production code path.
 import hashlib
 import json
 import math
+import re
 import os
 import threading
 import time
@@ -135,6 +136,9 @@ def env():
     from fastapi.testclient import TestClient
 
     assert core_db.schema() == META_SCHEMA, "test must own the metadata schema"
+    # Put the module-level fakes back afterwards so unit tests run later in the
+    # same session see the real functions.
+    real_source_cfg, real_embed = data_api._source_cfg, data_api_retrieval._azure_embed
     data_api._source_cfg = lambda system, env_name: {"host": params["host"], "port": int(params.get("port", 5432)),
                                                     "user": params["user"], "password": params.get("password", "")}
     data_api_retrieval._azure_embed = fake_embed
@@ -181,6 +185,8 @@ def env():
     yield {"client": client, "api": data_api, "retrieval": data_api_retrieval, "ids": ids, "models": models,
            "contract_v1": r.json()["id"], "save": save, "disable": disable, "dbname": params["dbname"]}
 
+    data_api._source_cfg, data_api_retrieval._azure_embed = real_source_cfg, real_embed
+    data_api_retrieval._cache._data.clear()
     data_api.STORE.close()
     core_db.close_pool()
     pg(f"DROP SCHEMA IF EXISTS {META_SCHEMA} CASCADE")
@@ -579,3 +585,20 @@ def test_mcp_tools_end_to_end(env, monkeypatch):
     assert json.loads(found.content[0].text)["matches"][0]["rimdocs_metadata"]["object_name"] == "Doc 15"
     assert bad_alias.is_error and "No table with alias" in bad_alias.content[0].text
     assert denied.is_error and "Invalid API key" in denied.content[0].text
+
+def test_source_failures_hide_driver_text_from_consumers(env, monkeypatch, caplog):
+    """Key holders get a reference id; the driver message (host, user, SQL) stays in the log."""
+    secret = "password authentication failed for user svc_reader at db7.internal.example:5432"
+
+    def broken(*_a, **_k):
+        raise RuntimeError(secret)
+
+    monkeypatch.setattr(env["api"], "_connector", broken)
+    for endpoint in ("columns", "count", "rows"):
+        r = env["client"].get(f"/data-api/retrieval-test/chunks/{endpoint}", headers={"X-API-Key": KEY})
+        assert r.status_code == 502, (endpoint, r.text)
+        detail = r.json()["detail"]
+        ref = re.search(r"Reference: ([0-9a-f]{10})$", detail)
+        assert ref, detail
+        assert "svc_reader" not in r.text and "internal" not in r.text
+        assert any(ref.group(1) in rec.getMessage() for rec in caplog.records), "ref must be findable in the log"

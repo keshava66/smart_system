@@ -7,6 +7,7 @@ import { fetchJson, formatWhen } from '../shared/studioHelpers';
 import { SkeletonLine } from '../shared/studioParts';
 import { apiEventSource } from '../../../utils/apiClient';
 import { useRBAC } from '../../../context/RBACContext';
+import { useReducedMotion } from '../../../utils/motion';
 import {
   KIND, KIND_ORDER, FRAGMENT, MASK, kindOf, findStage, flattenStages, routeSummary, pathOf, matchesPipeline, runCounts,
   extractUrl, streamErrorMessage, stageSubtitle, relativeDay, describe, stageCtx, stageSummaries, parseVal, word,
@@ -47,7 +48,6 @@ const shortDate = (iso) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 };
 const initials = (name) => String(name || '?').split(/[\s._@-]+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
-const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /** A callback that never changes identity but always runs the latest code - keeps memo'd parts from re-rendering. */
 function useStable(fn) {
@@ -626,9 +626,7 @@ const PANE_CSS = `
   .ss-hero-in { padding-top: 26px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ss-root *, .ss-root *::before, .ss-root *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-}
+html.reduce-motion .ss-root *, html.reduce-motion .ss-root *::before, html.reduce-motion .ss-root *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 `;
 
 /* ---------------------- plain-English text + values ---------------------- */
@@ -1042,6 +1040,7 @@ function Tray({ picked, maxPerRun, nameOf, running, extractorReady, reason, shak
 /* --------------------------------- hero ---------------------------------- */
 
 function HeroArt() {
+  const reduce = useReducedMotion();
   const nodes = [
     { x: 0, tech: 'Oracle', kind: 'SOURCE', label: 'SAP materials' },
     { x: 190, tech: 'Jython', kind: 'PROCESSOR', label: 'Clean & enrich' },
@@ -1055,7 +1054,7 @@ function HeroArt() {
       {nodes.slice(1).map((n, i) => (
         <path key={i} id={`ss-hw${i}`} className="ss-hero-wire" d={`M${nodes[i].x + W} ${MID} C${nodes[i].x + W + 20} ${MID}, ${n.x - 20} ${MID}, ${n.x} ${MID}`} />
       ))}
-      {!reducedMotion() && [0, 1, 2].map(i => (
+      {!reduce && [0, 1, 2].map(i => (
         <circle key={i} r="4" fill="#eb1700" opacity="0">
           <animateMotion dur="1.4s" begin={`${0.9 + i * 0.45}s`} repeatCount="4" fill="remove"><mpath href={`#ss-hw${i}`} /></animateMotion>
           <animate attributeName="opacity" values="0;1;1;0" dur="1.4s" begin={`${0.9 + i * 0.45}s`} repeatCount="4" />

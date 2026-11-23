@@ -1,22 +1,20 @@
 import { useEffect, useState } from 'react';
+import { reducedMotion, subscribeReducedMotion } from './motion';
 
 export const TIERS = ['full', 'lite', 'min'];
 
 let tier = null;
+let base = null;      // the machine's tier, lowered by measurement; ignores the motion setting
 let measured = false; // measurement only ever lowers, and only once
 const subscribers = new Set();
 
-function probe() {
-  if (typeof window === 'undefined') return 'full';
-
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    return 'lite';
-  }
-  return probeHardware();
+// The portal's "Reduce motion" setting caps the tier at lite while it is on.
+function withMotionSetting(t) {
+  return reducedMotion() && t === 'full' ? 'lite' : t;
 }
 
 let hardware = null;
-/** The machine's tier alone, ignoring the OS "reduce motion" setting. */
+/** The machine's tier alone, ignoring the "Reduce motion" setting. */
 export function hardwareTier() {
   if (!hardware) hardware = probeHardware();
   return hardware;
@@ -58,11 +56,14 @@ function probeHardware() {
 }
 
 export function getTier() {
-  if (!tier) tier = probe();
+  if (!tier) {
+    base = hardwareTier();
+    tier = withMotionSetting(base);
+  }
   return tier;
 }
 
-function setTier(next) {
+function publish(next) {
   if (next === tier) return;
   tier = next;
   subscribers.forEach((fn) => {
@@ -73,6 +74,15 @@ function setTier(next) {
     }
   });
 }
+
+function setTier(next) {
+  base = next;
+  publish(withMotionSetting(next));
+}
+
+subscribeReducedMotion(() => {
+  if (tier) publish(withMotionSetting(base));
+});
 
 export function subscribeTier(fn) {
   subscribers.add(fn);
@@ -115,7 +125,7 @@ export function measureTier(seconds = 5) {
         }
         if (fps < 46) slowWindows += 1;
         if (slowWindows >= 2) {
-          setTier(getTier() === 'full' ? 'lite' : 'min');
+          setTier(base === 'full' ? 'lite' : 'min');
           return stop();
         }
       }

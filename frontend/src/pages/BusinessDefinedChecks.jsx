@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import ExecutiveView from './ExecutiveView';
 import { apiEventSource, apiFetch } from '../utils/apiClient';
 import { useRBAC } from '../context/RBACContext';
-import { hardwareTier, measureTier, subscribeTier } from '../utils/perfTier';
+import { measureTier, usePerfTier } from '../utils/perfTier';
 import './BusinessDefinedChecks.css';
 import checkSrc from '/icons/JJ_Icon_Check_RGB.svg';
 import alertSrc from '/icons/JJ_Icon_Alert_RGB.svg';
@@ -4730,11 +4730,9 @@ function Page({ onBack }) {
   const { params: searchParams, update, closeLayer } = useUrlState();
   // GPU-less cloud PCs (software compositing) get the light mode: the same
   // page and its one-off animations, without continuous motion or per-frame
-  // repaint effects. Decided by the hardware (or measured slow frames), never
-  // by the OS "reduce motion" setting, which this page doesn't follow.
-  const [measuredSlow, setMeasuredSlow] = useState(false);
-  useEffect(() => subscribeTier((t) => setMeasuredSlow(t !== 'full')), []);
-  const lite = hardwareTier() !== 'full' || measuredSlow;
+  // repaint effects. Decided by the hardware, measured slow frames or the
+  // portal's "Reduce motion" setting; the OS setting is not followed.
+  const lite = usePerfTier() !== 'full';
   useEffect(() => measureTier(5), []);
   useEffect(() => {
     const html = document.documentElement;

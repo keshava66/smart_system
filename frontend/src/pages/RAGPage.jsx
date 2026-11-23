@@ -111,7 +111,7 @@ export default function RAGPage() {
             {bar && (
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0 rounded-md bg-jj-gray-08 shadow-[0_3px_8px_-4px_rgba(49,44,42,0.55)] transition-[left,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                className="pointer-events-none absolute inset-y-0 rounded-md bg-jj-gray-08 shadow-[0_3px_8px_-4px_rgba(49,44,42,0.55)] transition-[left,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
                 style={{ left: bar.left, width: bar.width }}
               />
             )}

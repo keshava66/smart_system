@@ -5,9 +5,9 @@ import re
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Header, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends
 
-from auth import require_auth, require_permission, dataset_sql
+from auth import require_permission, dataset_sql
 from bdc_admin import allowed_rule_ids, rule_allowed, review_mode_sql, DELTA_PREFIX
 from pydantic import BaseModel, Field
 

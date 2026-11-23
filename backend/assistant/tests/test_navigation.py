@@ -77,9 +77,9 @@ CASES = [
     ("open rimdocs", "un.rimdocs"),
     ("show me the rim docs explorer", "un.rimdocs"),
     ("open the rimdocs domain breakdown", "un.rimdocs.breakdown"),
-    ("take me to the SF query runner", "un.rimdocs.query"),
-    ("open the postgres query runner", "un.rimdocs.postgres"),
-    ("open the PG query runner", "un.rimdocs.postgres"),
+    ("take me to the SF query runner", "studio.snowflake"),
+    ("open the postgres query runner", "studio.postgres"),
+    ("open the PG query runner", "studio.postgres"),
     ("open rimdocs data table", "un.rimdocs.table"),
     ("take me to FDA and others", "un.fda"),
     ("open the FDA explorer", "un.fda"),
@@ -115,6 +115,14 @@ CASES = [
     ("show me the domain directory", "structured.directory"),
     # --- Data Studio ---
     ("open data studio", "studio"),
+    ("check index health on a postgres table", "studio.indexer"),
+    ("open pipeline studio", "pipelines"),
+    ("take me to the IND/CTA data quality tracker", "dqe.indcta"),
+    ("show me the safety data quality dashboard", "dqe.safety"),
+    ("open the rag evaluation page", "rag.evaluation"),
+    ("show audit people view", "audit.people"),
+    ("take me to the about us page", "about"),
+    ("open cortellis in virtual regulator", "un.vr.cortellis"),
     ("take me to snowflake", "studio.snowflake"),
     ("I want to run SQL", "studio.snowflake"),
     ("open a snowflake worksheet", "studio.snowflake"),
@@ -363,7 +371,7 @@ def test_audit_time_words_set_the_range():
 
 def test_button_destinations_carry_the_click():
     nav, _ = navigation.prepare_navigation({"destination": "studio.copier"}, ALL, "")
-    assert nav["params"] == {"pane": "snowflake"} and nav["then_click"] == "Copy tables"
+    assert nav["params"] == {"pane": "snowflake"} and nav["then_click"] == "Copy a table or schema"
 
 
 def test_already_there_is_not_sent_again():

@@ -2217,7 +2217,5 @@ const CSS = `
   .ilab .search input { width:90px; }
   .ilab .confirm > span { display:none; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .ilab *, .ilab *::before, .ilab *::after { animation:none !important; transition:none !important; }
-}
+html.reduce-motion .ilab *, html.reduce-motion .ilab *::before, html.reduce-motion .ilab *::after { animation:none !important; transition:none !important; }
 `;

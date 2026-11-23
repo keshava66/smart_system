@@ -1,25 +1,39 @@
-fastapi
-uvicorn
-snowflake-connector-python
-cryptography
-openpyxl
-rapidfuzz
-streamlit
-pandas
-requests
-oracledb
-xlsxwriter
-psycopg2-binary
-pytz
-orjson
-jaydebeapi
-JPype1
-openai
-numpy
-boto3
-olefile
-xlrd
-python-multipart
-paramiko
-PyYAML
-truststore
+# Portal backend. Versions are the ones the test suite last passed with;
+# ~= allows patch releases only. Upgrade deliberately and rerun the tests.
+fastapi~=0.165.0
+uvicorn~=0.54.0
+pydantic~=2.14.4
+python-multipart~=0.0.34
+requests~=2.34.2
+truststore~=0.10.5
+python-dotenv~=1.2.4
+cryptography~=50.0.2
+orjson~=3.13.0
+pytz~=2026.6
+PyYAML~=6.0.4
+
+# Databases and sources
+snowflake-connector-python~=5.2.0
+psycopg2-binary~=2.9.13
+oracledb~=26.1.0
+pymssql~=2.4.6
+PyMySQL~=1.2.4
+JayDeBeApi~=1.2.3
+JPype1~=1.7.1
+boto3~=1.44.9
+paramiko~=5.1.0
+
+# Data and files
+pandas~=3.1.1
+numpy~=2.5.5
+openpyxl~=3.1.5
+xlsxwriter~=3.3.3
+xlrd~=2.0.2
+olefile~=0.47.0
+rapidfuzz~=3.14.6
+
+# Assistant and retrieval
+openai~=3.57.0
+
+# The EPOD RAG chatbot the portal embeds is a Streamlit app; keep it installable from this environment.
+streamlit~=1.67.0

@@ -24,49 +24,49 @@ sys.path.insert(0, str(BACKEND))
 # The reviewed version of every file this change touched. A mismatch means the
 # copy here is older (or newer) than the one that was tested.
 EXPECTED = {
-    "Readme.md": "2e5ec0cd9715eb07aa34ae1fbea86e4d9f70e10611c31afdf629fa493481de66",
-    "backend/.env.example": "2c7fb52fd5fc5a7d4214fcd8be4805005d3ea7d39fe5d8e1251ae8a3633b20a3",
-    "backend/app.py": "25aaed420bb3e5dcf07e8a6c094f040521d5b379a7595e900b23f46abdf7b737",
-    "backend/assistant/knowledge/portal_overview.md": "72b86046f4ba89511aa8b60bff3ccb5f1a7985b6950788187fdd24a5837f944b",
+    "Readme.md": "cb130f81ecef89a86ec4e719aea2de95f6891246ec8697d2946fd3495e774296",
+    "backend/.env.example": "fcc77d10d043097a892377cfd466e05506521401506c6646816e843d9e32db5c",
+    "backend/app.py": "5bfc90a563765866e5e7c14053f152ba732b130b2a64822c00a62624c3d5521d",
+    "backend/assistant/knowledge/portal_overview.md": "8adec0141fc01c3c5f22d6b6d4d30212c7e6fc391c51cc74e06500571ac137e9",
     "backend/assistant/memory.py": "06ba66fe711846ddc7ed79e7fb27d8d8a56752f5cfd5182580dc887b43e52880",
-    "backend/assistant/portal_map.py": "6984ab840007c7f441b898a21a6fc9122e90ff5f1d981abea9fd91ae8aa556d7",
-    "backend/assistant/tests/test_navigation.py": "2935284c9ceec7f9a0693c54904696cae0876f07c2546400240f5fff29726275",
+    "backend/assistant/portal_map.py": "bd2bd91028d1131fd2560fa49915cd1a9b75a3f00c094670e67471fb850f6d23",
+    "backend/assistant/tests/test_navigation.py": "3c6aaacbeab5b1a9b3a6334eaa3dd71d6a5ff689a708bbe24bd5de87f1f2d624",
     "backend/assistant/tests/test_prompt_regression.py": "230f31ed42f1280ff8a4e6cfe6f1d96d1553315cb9627d2999df38013f55f7cc",
-    "backend/audit.py": "0734189ebfb81ecbad7936b41c6b061691f65430b2e9bceaee7f1aef6d399b1b",
-    "backend/auth.py": "d41230788116266bf092814fb81e237dd81a4759cae700e737e5f31b3b722169",
+    "backend/audit.py": "4b1e763b15a7108c8835aca230de397e4f32fd50f128c789c42e46e0a229f1bd",
+    "backend/auth.py": "9b6fe26a28a0b7fc90e6f7632bdc1bb446f3b2bc8033aebab03ebc7d924e9e4a",
     "backend/communication_center.py": "f81633448d3c900833af00d8ed22043388bc8f4d644d53d610b623089ad1a6b3",
-    "backend/data_api.py": "7e492d26fee96c0c8497143987e0f429bbc0f2eaa59f055c3e28424a8fbca66f",
+    "backend/data_api.py": "9e8ac64aaffdd4c9f9c5e00ef54a65ee105c44bb9f74b2bd1c046796ad0aadeb",
     "backend/data_api_mcp.py": "1e9338966edbc897ccefe9786814cace1128a81ce9e05ce2021a865937b41852",
     "backend/data_api_store.py": "514f39809567e6c057c91d4e81832773af5a1cb7a246bec2c99dd4c8aec87af3",
     "backend/db.py": "2f57e871e9dc4b14773e57301b729e5ee95fbe3cbeba84239a1979d609d7716a",
-    "backend/dq_config.example.json": "fd6bb1b645ec1fc6c5689320dde0e23e4c55d3dcf2dfddd1988b1043d9cdac6d",
-    "backend/ingestion_lab.example.yaml": "eb2fb92d3deb4398fd28830b2eedf3dc94ff578052d35a765718738a9347b8c0",
+    "backend/dq_config.example.json": "ebbff63dab7268748e268877198278902d376f17678633302733d8584f0424dc",
+    "backend/ingestion_lab.example.yaml": "506b94772b25864fa75be08dd0b5109b41df0ced74481f0296072559879020b0",
     "backend/ingestion_lab.py": "d1138c061106444b711bca47032c5c835d206a8a952e9af81badae24d3b05d90",
     "backend/migrations/smarthub_core/V001__core_schema.sql": "b23ad4e2748c3edd1a69526b8396669a7940aa04dd22a07548c80237765d328f",
     "backend/migrations/smarthub_core/V002__audit_search_index.sql": "a73e0da8586c9ce7fb37a13c20ad9fdc565e63fb91c29299e564996fd0957bec",
     "backend/migrations/smarthub_core/V003__it_validation_runs.sql": "58f912c50226d89b2fb0761e42141bd8926abd60edfdd8cc6cf4a8ec98d07bcd",
     "backend/migrations/smarthub_core/V005__ingestion_lab.sql": "959e43b23fa75687db2539348edc31d02f2fcd8d40e97856a0b2215050d724ff",
     "backend/migrations/smarthub_core/V008__pg_studio_workspace.sql": "9d34d8f0d50678ac34114410205279fc3043e0968be0686125eea79beb1e0ff1",
-    "backend/postgres_studio.py": "f258649d76744292dde0b021d545bdd25c869f0dc2a6f2ee58166d3b0f80828c",
+    "backend/postgres_studio.py": "851bbea576a08f1020754742b8d3b7c7da6bc8a64e2ad839f0588fdf7ed3d43d",
     "backend/release_notes.py": "f1114f94d9ea1bc740b3048e6e38fc7cff767d6a0adc132a6e1ca38da9d28cb9",
     "backend/scripts/check_timestamps.py": "78f4df3012ea5e75c1d8682497f06b9edd68c80a9d84248d34e3fa12058a94fd",
     "backend/scripts/migrate_sqlite_to_postgres.py": "85c73dc2ae5b83f1dffe1df4ae35766f1011fc79929dfac1742c5308cdedd97e",
     "backend/scripts/retrieval_demo.py": "50f2fddfa35ed2015c7bd45028b79ad594a307da6628e3380455fbb188e98232",
-    "backend/snowflake_query_runner.py": "70427d4912c5da3f8678ab6069cf2ff49ffffee2862da5ad4423a7761dd45610",
-    "backend/tests/test_data_api_retrieval_pg.py": "6e4ac49b22991bf2375e54254870243fbd1ed0671634c2380f07ea09d5589ccf",
-    "frontend/src/assistant/FloatingAssistant.jsx": "8e5b36bfc169e44a1ba0e6a4276cb41d4f5778b4ad9ba9a6c49e3eaaa278fdc2",
-    "frontend/src/assistant/assistantActions.js": "69477d8a0930fbe03ee4ec9e7ee1085c6b98d5e16b228a177e3fc6db7ecc0389",
+    "backend/snowflake_query_runner.py": "486f8d374bf71c3d83aee8a4ddc4d2e8cb8df8673500afeffbf3646438ec9889",
+    "backend/tests/test_data_api_retrieval_pg.py": "213f99c233fd9ba78f975ecca4693dfb0ac42290ceaf19ba8c0c3ef473a96d6c",
+    "frontend/src/assistant/FloatingAssistant.jsx": "04d51ee8b2d607f8e5f1a98f887f0c97452afd7bb6a3ab6b998f75db851ef24a",
+    "frontend/src/assistant/assistantActions.js": "b5ca2babb4993804df907306684cdfd2d9dd8c2149272497d33ee9e8ca536157",
     "frontend/src/assistant/pageTips.js": "e7ce501f8b3109ebd72ac9a4d366c27eb283c6791e7256ed1ab3c6d3c9c42c67",
-    "frontend/src/config/tools.js": "0e4adeb2ce224c52fa77fcc74fde4a5bed0735f1bcb4991be41f13490bdda2a5",
-    "frontend/src/context/RBACContext.jsx": "69ab253b39d3a32701d8f728dd56446dab24bb2b6b8580032d688dd71bc62ad2",
-    "frontend/src/pages/AuditPage.jsx": "9da6cf8934ec3cfadd818fe0e46e9c2e7f4697994fcd041ded3de3da7f1233b2",
-    "frontend/src/pages/IngestionLab.jsx": "88f4de2d06dae86a092474f851a7758d91554b315d9b36b07259633b981bace0",
-    "frontend/src/pages/components/CommunicationParts.jsx": "af54681d7380bf21f05f529b53651f9ce315e8bb0d803108d71a6502ed7e33d4",
+    "frontend/src/config/tools.js": "c9f1841f8a93ea09fed5528ed43b02053184e5d5661536119ec06441e2f290c4",
+    "frontend/src/context/RBACContext.jsx": "15141ed0396c753584f8c58022d7eebb32724ddce9bcaf63402493bbee2a28a7",
+    "frontend/src/pages/AuditPage.jsx": "72044aca9b0d876a332a9d8a591344c57f8bf8a64117d9b452b764b175bc9629",
+    "frontend/src/pages/IngestionLab.jsx": "69bc15f69285310bcd3b60aa9774137a2d9ea281b24cb8f49392721180be42eb",
+    "frontend/src/pages/components/CommunicationParts.jsx": "39069ed7c9dcde30b0ee89e93a7cf0fda056c40ad56c1a12b5ce126422b72ee2",
     "frontend/src/pages/dataApi/dataApiDocs.js": "57dca1cf847121ef4049bdc0d7f5c4f852d06ea691a98b551c962ce98a1e6879",
-    "frontend/src/pages/dataStudio/panes.js": "4bec909bafca9902f6055c687403bf1791db019b1db315fe5bda633dbaf9b774",
-    "frontend/src/pages/dataStudio/sf_pg/sf_pg_pane.jsx": "ecbc285ba17008edb7fd172f1928b22bfdafca25410f27538ad79bab897c2ae0",
-    "frontend/src/pages/dataStudio/shared/studioHelpers.jsx": "b9eab39f75a27aa786cb2b0b7d636232d45018fa8f01123fd1e5bae43e935497",
-    "frontend/src/pages/userManagement/access.js": "6c7f77f4194d948dae7fffdb1dd2d46fa13b6f111e400927b265d908abf0406e",
+    "frontend/src/pages/dataStudio/panes.js": "a5251cd9bee298b914b8c4242a943928b8a75cc71c82cb40b7746ba1e835c78a",
+    "frontend/src/pages/dataStudio/sf_pg/sf_pg_pane.jsx": "50cad06721f707d6ccd0d1613e3c62a15629cb6a0cada037fd32b23a3d1a0e69",
+    "frontend/src/pages/dataStudio/shared/studioHelpers.jsx": "6c0bbefcc87e1c872343b57122ad7ab57997dbc16e946c75437d0ec3cea29362",
+    "frontend/src/pages/userManagement/access.js": "7c6f16204a8fb58d9a6af582e4656ffe9f7827abd4e4e0f97b2b16d558c0f363",
 }
 
 TABLES = [
@@ -120,7 +120,12 @@ def check_files():
 
 
 def check_env():
+    import assistant.env  # noqa: F401  loads backend/.env, as the server does at startup
     import db
+    if os.environ.get("AZURE_TENANT_ID", "").strip():
+        report("OK", "AZURE_TENANT_ID", "sign-in pinned to the configured tenant")
+    else:
+        report("FAIL", "AZURE_TENANT_ID", "not set - every sign-in is refused")
     s = db.settings()
     if not s.dsn:
         report("FAIL", "SMARTHUB_DB_DSN", "not set (environment or backend/.env)")

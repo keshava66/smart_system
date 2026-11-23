@@ -28,29 +28,6 @@ export const AuthProvider = ({ children }) => {
   // Send periodic heartbeat to backend while authenticated
   useHeartbeat(user?.email || user?.username || null);
 
-  // Fetch user's AD groups from Microsoft Graph
-  const fetchUserGroups = async (accessToken) => {
-    try {
-      const response = await fetch('https://graph.microsoft.com/v1.0/me/memberOf', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        console.warn('Failed to fetch user groups:', response.status);
-        return [];
-      }
-
-      const data = await response.json();
-      return data.value || [];
-    } catch (error) {
-      console.warn('Error fetching user groups:', error);
-      return [];
-    }
-  };
-
   // Check authentication status
   useEffect(() => {
     const checkAuth = async () => {

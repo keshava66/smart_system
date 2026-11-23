@@ -4,8 +4,6 @@ import csv
 import io
 import logging
 import os
-import threading
-import time
 from decimal import Decimal
 from datetime import date, datetime, time as time_, timedelta
 from typing import Any, Dict, List, Optional
@@ -14,7 +12,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from auth import require_permission
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

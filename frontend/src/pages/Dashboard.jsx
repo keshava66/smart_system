@@ -11,9 +11,8 @@ import './Dashboard.css';
 import arrowIcon  from "/icons/JJ_Icon_Chevron_Right.svg";
 import searchIcon from "/icons/JJ_Icon_Search_RGB.svg";
 import shieldIcon from "/icons/JJ_Icon_Shield_RGB.svg";
+import { PALETTE_EVENT } from "../utils/events";
 
-// Header's search button fires this; the palette lives here on the dashboard.
-export const PALETTE_EVENT = 'smarthub:open-palette';
 
 const ACCENT_HEX = {
   red: '#eb1700', blue: '#0f68b2', violet: '#8c3bbb', green: '#328714',
@@ -41,10 +40,9 @@ const KIND_TAG = {
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '');
 
-// Windows Cloud PCs have no GPU and report reduced motion (OS animations are
-// off there by default). Neither is a reason to freeze the page: both only
-// start it on the lighter scene, the same rule the other welcome screens use.
-// getTier() covers both cases.
+// Windows Cloud PCs have no GPU; that and the portal's "Reduce motion" setting
+// only start the page on the lighter scene, never freeze it. getTier() covers
+// both. The OS reduce-motion setting is not followed.
 
 // One frame-budget watcher shared by both canvases. It samples the raw rAF
 // cadence - not the 30fps-gated draws, which would always read as slow - and

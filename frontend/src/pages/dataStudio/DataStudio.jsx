@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRBAC } from '../../context/RBACContext';
 import { IconDefs, Icon } from './shared/studioParts';
@@ -14,6 +14,12 @@ const readPane = () => {
 const savePane = (id) => {
   try { window.localStorage.setItem(PANE_KEY, id); } catch { /* private mode */ }
 };
+
+const PaneLoading = () => (
+  <div className="h-full flex items-center justify-center" role="status" aria-label="Loading">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-jj-red" />
+  </div>
+);
 
 // Tab bar on top, panes underneath. A pane is only mounted the first time it's
 // opened, and stays mounted after that, so switching back finds the worksheet,
@@ -72,14 +78,14 @@ export default function DataStudio() {
   // Nothing to switch between with a single pane, so skip the bar.
   if (panes.length === 1) {
     const Only = panes[0].component;
-    return <Only logInPage={logInPage} active />;
+    return <Suspense fallback={<PaneLoading />}><Only logInPage={logInPage} active /></Suspense>;
   }
 
   return (
     <div className="h-full max-h-screen flex flex-col overflow-hidden bg-white">
       <IconDefs />
 
-      <div className="flex-shrink-0 bg-jj-gray-01 border-b border-jj-gray-02 px-7 py-2">
+      <div className="flex-shrink-0 bg-jj-gray-01 border-b border-jj-gray-02 px-3 sm:px-5 lg:px-7 py-2">
         <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {panes.map(p => {
             const isActive = p.id === active;
@@ -119,7 +125,9 @@ export default function DataStudio() {
           const Pane = p.component;
           return (
             <div key={p.id} className={p.id === active ? 'h-full' : 'hidden'}>
-              <Pane logInPage={logInPage} active={p.id === active} />
+              <Suspense fallback={<PaneLoading />}>
+                <Pane logInPage={logInPage} active={p.id === active} />
+              </Suspense>
             </div>
           );
         })}

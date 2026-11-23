@@ -1,6 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+// Applies the saved motion setting before the first render.
+import './utils/motion'
 import App from './App.jsx'
 import { EventType } from '@azure/msal-browser'
 import { MsalProvider } from '@azure/msal-react'

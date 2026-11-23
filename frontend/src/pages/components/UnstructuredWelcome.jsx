@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { reducedMotion } from '../../utils/motion';
 
 import recordsIcon from "/icons/JJ_Icon_Records_Information_RGB.svg";
 import databaseIcon from "/icons/JJ_Icon_Database_RGB.svg";
@@ -72,11 +73,9 @@ const fitCanvas = (canvas) => {
 // One shared budget watcher for both canvases.
 const PERF = {
   lite: false, n: 0, sum: 0, last: 0,
-  // Windows Cloud PCs commonly report reduced-motion (OS animations are off by
-  // default there), so it selects the calm lite scene rather than freezing the
-  // canvases on a single static frame.
-  calm: typeof window !== 'undefined' && window.matchMedia
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false,
+  // The portal's "Reduce motion" setting picks the calm lite scene rather
+  // than freezing the canvases on a single static frame.
+  get calm() { return reducedMotion(); },
   sample(t) {
     if (this.last) {
       const d = t - this.last;

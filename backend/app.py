@@ -16,7 +16,7 @@ if (_os.environ.get("SMARTHUB_OS_TRUSTSTORE") or "true").strip().lower() not in 
 # either default behaves the same here; keep the logs readable.
 _warnings.filterwarnings("ignore", message=r".*enable_server_session_keep_alive_auto_detection was not set.*", category=FutureWarning)
 
-from fastapi import FastAPI, HTTPException, Body, Query, Header, Depends
+from fastapi import FastAPI, HTTPException, Body, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
 import orjson
@@ -2539,8 +2539,6 @@ def get_bdc_failed_rows(
 
     sf = bdc_connection_manager.get_client()
     dq_config = bdc_config_manager.get_dq_config()
-    sf_config = bdc_config_manager.get_snowflake_config()
-    database = sf_config.get("database")
     latest_key = dq_config['rule_latest_view']
     if delta_mode:
         latest_key = latest_key + '_DELTA' if not latest_key.endswith('_DELTA') else latest_key
@@ -2656,13 +2654,10 @@ def get_bdc_failed_rows_count(
 
     sf = bdc_connection_manager.get_client()
     dq_config = bdc_config_manager.get_dq_config()
-    sf_config = bdc_config_manager.get_snowflake_config()
-    database = sf_config.get("database")
     latest_key = dq_config['rule_latest_view']
     if delta_mode:
         latest_key = latest_key + '_DELTA' if not latest_key.endswith('_DELTA') else latest_key
     rule_latest_view = bdc_config_manager.get_full_table_name(latest_key)
-    rule_input_table = bdc_config_manager.get_full_table_name(dq_config['rule_input_table'])
 
     meta = sf.execute(f"""
         SELECT v.RULE_TITLE
@@ -2697,7 +2692,6 @@ def download_bdc_failed_rows(
         auth: dict = Depends(require_bdc_rule_download),
 ):
     import io as _io
-    from datetime import datetime as _dt
     import xlsxwriter
 
     if not bdc_connection_manager or not bdc_config_manager:
@@ -2705,8 +2699,6 @@ def download_bdc_failed_rows(
 
     sf = bdc_connection_manager.get_client()
     dq_config = bdc_config_manager.get_dq_config()
-    sf_config = bdc_config_manager.get_snowflake_config()
-    database = sf_config.get("database")
     latest_key = dq_config['rule_latest_view']
     if delta_mode:
         latest_key = latest_key + '_DELTA' if not latest_key.endswith('_DELTA') else latest_key
@@ -2886,8 +2878,6 @@ async def prepare_bdc_download(
 
             sf = bdc_connection_manager.get_client()
             dq_config = bdc_config_manager.get_dq_config()
-            sf_config = bdc_config_manager.get_snowflake_config()
-            database = sf_config.get("database")
             latest_key = dq_config['rule_latest_view']
             if delta_mode:
                 latest_key = latest_key + '_DELTA' if not latest_key.endswith('_DELTA') else latest_key
@@ -3546,7 +3536,6 @@ def get_delta_rows(
     if delta_mode and not view_key.endswith('_DELTA'):
         view_key += '_DELTA'
     rule_view = bdc_config_manager.get_full_table_name(view_key)
-    stg_schema = bdc_config_manager.get_stg_schema()
 
     meta = sf.execute(f"SELECT RULE_TITLE FROM {rule_view} WHERE RULE_ID = %(rule_id)s LIMIT 1", {"rule_id": rule_id})
     if not meta.rows:
@@ -4623,7 +4612,7 @@ def update_custom_role(
         old_desc = previous.get('description', '')
         new_desc = role_definition.get('description', '')
         if old_desc != new_desc:
-            changes.append(f"Description changed")
+            changes.append("Description changed")
 
         # Color change
         old_color = previous.get('color', '')
@@ -4736,7 +4725,7 @@ async def delete_custom_role(
             details=f"Role reset to defaults: '{role_id}'" if is_builtin else f"Deleted custom role: '{role_id}'",
         )
 
-        message = f"Built-in role reset to defaults successfully" if is_builtin else "Custom role deleted successfully"
+        message = "Built-in role reset to defaults successfully" if is_builtin else "Custom role deleted successfully"
         return {"success": True, "message": message, "removed_users": users_to_remove}
     except HTTPException:
         raise
@@ -5335,7 +5324,6 @@ async def _it_run_task(run_id: str, db_name: str, cmd: list, log: _ItLog):
     Windows' SelectorEventLoop (uvicorn --reload), and asyncio.to_thread(readline) would hold one of
     the shared executor threads for the whole run, slowing every other request."""
     import os
-    import subprocess
     import threading
     label = _IT_DB_LABEL[db_name]
     loop = asyncio.get_running_loop()

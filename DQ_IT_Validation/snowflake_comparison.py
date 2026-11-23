@@ -5,7 +5,7 @@ from datetime import datetime
 import json
 import sys
 import argparse
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock, Thread
 import time
@@ -35,7 +35,7 @@ def log_detailed_error(context: str, error: Exception, additional_info: Dict = N
     print_safe(f"{'=' * 80}")
     print_safe(f"Error: {str(error)}")
     if additional_info:
-        print_safe(f"\nDetails:")
+        print_safe("\nDetails:")
         for key, value in additional_info.items():
             print_safe(f"  • {key}: {value}")
     print_safe(f"{'=' * 80}\n")
@@ -480,12 +480,12 @@ class SnowflakeConnector:
     def ensure_connected(self) -> bool:
         """Ensure connection is alive, reconnect if needed"""
         if not self.is_alive():
-            print_safe(f"      ⚠️  Snowflake connection lost, reconnecting...")
+            print_safe("      ⚠️  Snowflake connection lost, reconnecting...")
             if self.reconnect():
-                print_safe(f"      ✓ Snowflake reconnected successfully")
+                print_safe("      ✓ Snowflake reconnected successfully")
                 return True
             else:
-                print_safe(f"      ✗ Snowflake reconnection failed")
+                print_safe("      ✗ Snowflake reconnection failed")
                 return False
         return True
 
@@ -1333,7 +1333,7 @@ class DataValidator:
                 'validation_time': timeout,
                 'Last_Checked': datetime.now().isoformat()
             }
-        except Exception as e:
+        except Exception:
             executor.shutdown(wait=True)
             raise
 
@@ -1779,7 +1779,7 @@ def main():
     # ── Print overall summary ─────────────────────────────────────────────────
     print_header("OVERALL VALIDATION SUMMARY", "=", 80)
     ov = consolidated_report['overall_summary']
-    print_safe(f"\n📊 ACROSS ALL SCHEMAS:")
+    print_safe("\n📊 ACROSS ALL SCHEMAS:")
     print_safe(f"   Total Tables Validated : {ov['total_validations']}")
     print_safe(f"   ✅ Passed              : {ov['passed']}")
     print_safe(f"   🚨 Critical            : {ov['critical']}")

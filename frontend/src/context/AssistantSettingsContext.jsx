@@ -29,7 +29,7 @@ export const AssistantSettingsProvider = ({ children }) => {
     if (!canUseAssistant) {
       // Not an admin: force off, skip the network call entirely, done.
       setEnabledState(false);
-      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* storage blocked */ }
       setLoaded(true);
       return;
     }
@@ -44,7 +44,7 @@ export const AssistantSettingsProvider = ({ children }) => {
         const data = await res.json();
         const serverEnabled = !!data?.settings?.enabled;
         setEnabledState(serverEnabled);
-        try { localStorage.setItem(STORAGE_KEY, String(serverEnabled)); } catch {}
+        try { localStorage.setItem(STORAGE_KEY, String(serverEnabled)); } catch { /* storage blocked */ }
       } catch {
         // offline or backend down — keep whatever localStorage/default gave us
       } finally {
@@ -56,7 +56,7 @@ export const AssistantSettingsProvider = ({ children }) => {
   const setEnabled = async (value) => {
     if (!canUseAssistant) return; // belt-and-suspenders — the UI shouldn't call this at all
     setEnabledState(value);
-    try { localStorage.setItem(STORAGE_KEY, String(value)); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, String(value)); } catch { /* storage blocked */ }
     try {
       const token = await getAccessToken();
       await fetch(`${API_BASE_URL}/api/audit/assistant-settings`, {

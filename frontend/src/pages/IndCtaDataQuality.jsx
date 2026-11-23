@@ -1,7 +1,7 @@
 import { apiFetch, downloadFile } from '../utils/apiClient';
 import { Component, Suspense, createContext, lazy, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { hardwareTier, measureTier, subscribeTier } from '../utils/perfTier';
+import { measureTier, usePerfTier } from '../utils/perfTier';
 import { useRBAC } from '../context/RBACContext';
 
 // colours, confidence and icon maps
@@ -601,14 +601,6 @@ function useOnline() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
   return online;
-}
-
-// The portal's perfTier also counts the OS reduce-motion setting as "lite"; this
-// page only looks at the hardware, and steps down if the frame-rate check says so.
-function useMachineTier() {
-  const [tier, setTier] = useState(hardwareTier);
-  useEffect(() => subscribeTier(() => setTier((t) => (t === 'full' ? 'lite' : 'min'))), []);
-  return tier;
 }
 
 // true only once `flag` has stayed on for `ms`, so fast loads never flash a skeleton
@@ -2743,7 +2735,8 @@ function Page({ onBack }) {
   const online = useOnline();
   // full, lite (no GPU or a weak machine) or min (still dropping frames).
   // Decided by the machine alone; the OS "reduce motion" setting is not used here.
-  const tier = useMachineTier();
+  // hardware, the frame-rate check and the portal's "Reduce motion" setting; never the OS setting
+  const tier = usePerfTier();
   const [nonce, setNonce] = useState(0);
   const [offlineSeen, setOfflineSeen] = useState(false);
 

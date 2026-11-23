@@ -2159,6 +2159,12 @@ def _authorize_key(
     return row
 
 
+
+def _error_ref() -> str:
+    """Short id tying a consumer's 502 to the full error in the server log. Key
+    holders sit outside the portal, so driver messages (hosts, users, SQL) stay in the log."""
+    return uuid.uuid4().hex[:10]
+
 @data_api_router.get("/{api_id}/tables")
 def exec_list_tables(api_id: str, request: Request, api_key: str = Query("")):
     """Consumer endpoint: list the table aliases exposed by a Data API Export.
@@ -2252,10 +2258,11 @@ def exec_get_columns(api_id: str, alias: str, request: Request, api_key: str = Q
     except ConnectorError as e:
         _log_request(row["id"], "columns", alias=alias, request=request, status=400, mark_used=False)
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error reading columns for data-api {api_id}/{alias}: {e}")
+    except Exception:
+        ref = _error_ref()
+        logger.exception(f"Error reading columns for data-api {api_id}/{alias} (ref {ref})")
         _log_request(row["id"], "columns", alias=alias, request=request, status=502, mark_used=False)
-        raise HTTPException(status_code=502, detail=f"Could not read columns: {e}")
+        raise HTTPException(status_code=502, detail=f"Could not read columns from the source. Reference: {ref}")
 
     # Shape here is exactly what it always was — name and the source's own
     # declared type — because consumers build schemas off it. The keys after
@@ -2371,9 +2378,10 @@ def exec_get_count(
         if _is_bad_value(e):
             _log_request(row["id"], "count", alias=alias, request=request, status=400, mark_used=False)
             raise HTTPException(status_code=400, detail=_bad_value_detail(e))
-        logger.error(f"Error counting rows for data-api {api_id}/{alias}: {e}")
+        ref = _error_ref()
+        logger.exception(f"Error counting rows for data-api {api_id}/{alias} (ref {ref})")
         _log_request(row["id"], "count", alias=alias, request=request, status=502, mark_used=False)
-        raise HTTPException(status_code=502, detail=f"Could not count rows: {e}")
+        raise HTTPException(status_code=502, detail=f"Could not count rows at the source. Reference: {ref}")
     elapsed_ms = int((time.monotonic() - started) * 1000)
     _log_request(
         row["id"], "count", alias=alias, request=request,
@@ -2680,9 +2688,10 @@ def exec_get_rows(
         if _is_bad_value(e):
             _log_request(row["id"], "rows", alias=alias, request=request, status=400, mark_used=False)
             raise HTTPException(status_code=400, detail=_bad_value_detail(e))
-        logger.error(f"Error reading rows for data-api {api_id}/{alias}: {e}")
+        ref = _error_ref()
+        logger.exception(f"Error reading rows for data-api {api_id}/{alias} (ref {ref})")
         _log_request(row["id"], "rows", alias=alias, request=request, status=502, mark_used=False)
-        raise HTTPException(status_code=502, detail=f"Could not read rows: {e}")
+        raise HTTPException(status_code=502, detail=f"Could not read rows from the source. Reference: {ref}")
 
     has_more = len(rows) == capped_limit
     next_cursor = None

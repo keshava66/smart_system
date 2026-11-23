@@ -25,5 +25,7 @@ audit_log.db-shm
 /release_notes.db-wal
 /assistant/knowledge/pending_corrections.jsonl
 eval_failures_*.json
-ingestion_lab.yaml/audit_spool/
+/audit_spool/
 ingestion_lab.yaml
+# Output of the Denodo probe script (denodo_test.py)
+*.json.nx

@@ -44,7 +44,8 @@ const STYLES = `
 .vrw-shimmer { background: linear-gradient(90deg, #ece8e4 30%, #f9f8f7 50%, #ece8e4 70%); background-size: 200% 100%; animation: vrw-shine 1.6s linear infinite; }
 /* scrollbar look comes from the explorer-wide ue-scrollbars style */
 /* reduce motion (also Windows 'animation effects' off): no sweep, slow fade so it still reads as loading */
-@media (prefers-reduced-motion: reduce) { .vrw-rise { animation: none; } .vrw-shimmer { animation: vrw-pulse 1.8s ease-in-out infinite; } }
+html.reduce-motion .vrw-rise { animation: none; }
+html.reduce-motion .vrw-shimmer { animation: vrw-pulse 1.8s ease-in-out infinite; }
 `;
 
 // "FDA CANADIAN_THERAPEUTICS_PROD_ENG_XML" under "Canadian Therapeutics" -> "Prod ENG XML"

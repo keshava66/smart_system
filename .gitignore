@@ -5,3 +5,6 @@ package-lock.json
 /DQ_IT_Validation/mariadb_config.json
 /DQ_IT_Validation/lift_config.json
 __pycache__/
+
+# Release check output and its signed-in browser profile
+/.release_check/

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../utils/apiClient';
-import { CLS, Icon, Modal } from './CommunicationParts';
+import { Icon, Modal } from './CommunicationParts';
+import { CLS } from './communicationLib';
 
 import aiIcon      from "/icons/JJ_Icon_AI_RGB.svg";
 import refreshIcon from "/icons/JJ_Icon_Refresh_RGB.svg";
@@ -143,7 +144,7 @@ export const WhatsNewPanel = ({ selected, onSelectedChange, onDraft, showToast, 
     } finally {
       setLoading(false);
     }
-  }, [view, showCommits, showError]);
+  }, [view, showCommits]);
 
   useEffect(() => { load(); }, [load]);
 

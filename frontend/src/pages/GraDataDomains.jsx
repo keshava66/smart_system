@@ -114,7 +114,7 @@ function buildDomainRecord(domain, count, columns = [], rows = []) {
   const faqs = [];
   const faqSeen = new Set();
 
-  rows.forEach((r, i) => {
+  rows.forEach((r) => {
     if (iAdGroup > -1 && !blank(r[iAdGroup])) {
       String(r[iAdGroup]).split(/[\n;,|]+/).forEach((g) => {
         const name = g.trim();
@@ -730,7 +730,7 @@ function SweepWedge() {
  *  - only the medallion wrappers take the pointer
  * ======================================================================== */
 
-function DomainOrbit({ domains, query, headerRef, onOpen }) {
+function DomainOrbit({ domains, query, onOpen }) {
   const tier = usePerfTier();
   const lite = tier !== 'full';
   const cycle = SWEEP_CYCLE[tier] || SWEEP_CYCLE.full;
@@ -2502,7 +2502,7 @@ function PersonNode({ m, onCopy, delay = 0 }) {
  * past it the wrapper scrolls instead of rendering something unreadable. */
 const MIN_SCALE = 0.42;
 
-function useFitToWidth(deps) {
+function useFitToWidth(sizeKey) {
   const outer = useRef(null);
   const inner = useRef(null);
   const [fit, setFit] = useState({ scale: 1, w: 0, h: 0, cramped: false });
@@ -2539,7 +2539,7 @@ function useFitToWidth(deps) {
     obs.observe(box);
     obs.observe(chart);
     return () => obs.disconnect();
-  }, deps);
+  }, [sizeKey]);
 
   return { outer, inner, ...fit };
 }
@@ -2654,7 +2654,7 @@ function GroupMembers({ group, state, onCopy }) {
       ].filter((b) => b.people.length)
     : [];
 
-  const { outer, inner, scale, w, h, cramped } = useFitToWidth([members ? members.length : 0]);
+  const { outer, inner, scale, w, h, cramped } = useFitToWidth(members ? members.length : 0);
 
   return (
     <div>
@@ -3414,7 +3414,6 @@ export default function GraDataDomains() {
         <DomainOrbit
           domains={records}
           query={query}
-          headerRef={headerRef}
           onOpen={(domain) => {
             patch({ domain: slug(domain), open: '1' });
             loadDomain(domain);

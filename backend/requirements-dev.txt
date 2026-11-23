@@ -1,0 +1,7 @@
+# Test and release-check tools, on top of requirements.txt.
+-r requirements.txt
+pytest~=9.2.0
+httpx~=0.28.1
+ruff~=0.17.6
+packaging~=26.3
+playwright~=1.65.2

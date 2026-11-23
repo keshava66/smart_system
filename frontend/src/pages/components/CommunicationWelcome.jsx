@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePerfTier, measureTier } from '../../utils/perfTier';
-import { PLACEHOLDERS } from './CommunicationParts';
+import { PLACEHOLDERS } from './communicationLib';
 
 import aiIcon       from "/icons/JJ_Icon_AI_RGB.svg";
 import calendarIcon from "/icons/JJ_Icon_Calendar_RGB.svg";

@@ -153,7 +153,7 @@ def _ident(stem: str, suffix: str = "") -> str:
     full = stem + suffix
     if len(full.encode()) <= 63:
         return full
-    tag = "_" + hashlib.sha1(full.encode()).hexdigest()[:8]
+    tag = "_" + hashlib.sha1(full.encode(), usedforsecurity=False).hexdigest()[:8]
     room = 63 - len((tag + suffix).encode())
     return stem.encode()[:room].decode(errors="ignore") + tag + suffix
 
@@ -163,7 +163,7 @@ def index_name(table: str, col: str, kind: str) -> str:
     clean = re.sub(r"\W", "_", raw.lower())
     if clean != raw:
         # "Name" and "name", or "a b" and "a_b", would otherwise get the same index name
-        clean += "_" + hashlib.sha1(raw.encode()).hexdigest()[:6]
+        clean += "_" + hashlib.sha1(raw.encode(), usedforsecurity=False).hexdigest()[:6]
     return _ident(clean, f"_{kind}")
 
 

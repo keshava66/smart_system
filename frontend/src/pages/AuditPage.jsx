@@ -177,9 +177,8 @@ const easternParts = (d = new Date()) => {
 
 const readStore = (store, key) => { try { return window[store].getItem(key); } catch { return null; } };
 const writeStore = (store, key, v) => { try { window[store].setItem(key, v); } catch { /* private mode */ } };
-// Note: prefers-reduced-motion is deliberately not used to switch animations
-// off. Windows Cloud PCs report it by default (OS animations are off there);
-// the welcome screens keep animating on them, and so does this page.
+// Motion follows the portal's "Reduce motion" setting (utils/motion.js), never
+// the OS setting: Windows Cloud PCs report that one by default.
 
 // ─── fetching ───────────────────────────────────────────────────────────────
 

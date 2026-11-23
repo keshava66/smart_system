@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useIsAuthenticated, useMsal } from "@azure/msal-react";
 import { AuthProvider } from "./context/AuthContext";
+import { useSyncedMotionPreference } from "./utils/motion";
 import { RBACProvider, PermissionGate, useRBAC } from "./context/RBACContext";
 import { SessionTimeoutProvider } from "./context/SessionTimeoutContext";
 import { AssistantSettingsProvider, useAssistantSettings } from "./context/AssistantSettingsContext";
@@ -15,6 +16,9 @@ import LoginPage from "./pages/LoginPage";
 import LogoutPage from "./pages/LogoutPage";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
+import MenuButton from "./components/MenuButton";
+import { NARROW, WIDE, useMediaQuery } from "./hooks/useMediaQuery";
+import logoMark from "/sh_logo_small_black.svg";
 import Dashboard from "./pages/Dashboard";
 import { lazyPage, onPageLoading } from "./utils/lazyPage";
 
@@ -250,19 +254,42 @@ const AppLayoutInner = () => {
 
   // Track page navigation in audit log
   usePageTracking(user?.email || user?.username || null);
+  useSyncedMotionPreference(user?.email || null);
 
-  const [dashNavOpen, setDashNavOpen] = useState(true);
+  const narrow = useMediaQuery(NARROW);
+  const wide = useMediaQuery(WIDE);
+
+  // Dashboard opens with the sidebar expanded where there's room for it.
+  const [dashNavOpen, setDashNavOpen] = useState(wide);
   useEffect(() => {
-    if (isDashboard) setDashNavOpen(true);
-  }, [isDashboard]);
+    if (isDashboard) setDashNavOpen(wide);
+  }, [isDashboard, wide]);
+
+  // Phones and tablets: the sidebar is a drawer, shut on every navigation.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => { setDrawerOpen(false); }, [location.pathname, narrow]);
+  const toggleDrawer = () => setDrawerOpen((o) => !o);
   useEffect(() => {
     recordVisit(describeLocation(location.pathname, location.search));
   }, [location.pathname, location.search]);
   return (
-    <div className={`flex h-screen bg-jj-gray-01 ${isDashboard ? 'flex-col' : ''}`}>
+    <div className={`flex h-screen h-[100dvh] bg-jj-gray-01 ${isDashboard || narrow ? 'flex-col' : ''}`}>
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <RouteProgress />
       {isDashboard && (
-        <Header navOpen={dashNavOpen} onToggleNav={() => setDashNavOpen(o => !o)} />
+        <Header
+          navOpen={narrow ? drawerOpen : dashNavOpen}
+          onToggleNav={narrow ? toggleDrawer : () => setDashNavOpen(o => !o)}
+        />
+      )}
+      {!isDashboard && narrow && (
+        <div className="relative z-40 flex items-center gap-2 h-14 flex-shrink-0 px-2 bg-white border-b border-jj-gray-02">
+          <MenuButton open={drawerOpen} onClick={toggleDrawer} />
+          <img src={logoMark} alt="" className="w-7 h-7" draggable={false} />
+          <span className="font-johnson-display text-lg text-jj-gray-08 whitespace-nowrap">
+            <span className="font-bold text-jj-red">GRA</span> SmartHub
+          </span>
+        </div>
       )}
 
       <div className="flex flex-grow min-h-0 overflow-hidden">
@@ -270,8 +297,10 @@ const AppLayoutInner = () => {
           showUserMenu={!isDashboard}
           showLogo={!isDashboard}
           expanded={isDashboard ? dashNavOpen : undefined}
+          drawerOpen={drawerOpen}
+          onDrawerClose={() => setDrawerOpen(false)}
         />
-        <main className="flex-grow min-w-0 overflow-auto">
+        <main id="main-content" tabIndex={-1} className="flex-grow min-w-0 overflow-auto focus:outline-none">
           <PageLoadBoundary resetKey={location.pathname}>
           <Suspense fallback={<PageLoading />}>
           <Routes>

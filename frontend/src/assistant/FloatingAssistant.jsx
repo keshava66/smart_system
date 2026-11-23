@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useReducedMotion } from '../utils/motion';
 import { runAction, describeAction, executeAction, stopTour, resolveRoute } from './assistantActions';
 import { tipForPath, emotionFor, promptsForPath } from './pageTips';
 import { useSpeech } from './useSpeech';
@@ -109,7 +110,7 @@ function defaultPos() {
     if (saved && typeof saved.top === 'number') {
       return { side: saved.side === 'left' ? 'left' : 'right', top: Math.max(0, Math.min(window.innerHeight - AV_H_BASE, saved.top)) };
     }
-  } catch {}
+  } catch { /* storage blocked or saved value unreadable */ }
   return { side: 'right', top: window.innerHeight - AV_H_BASE };
 }
 
@@ -146,21 +147,15 @@ export default function FloatingAssistant() {
     try {
       const saved = localStorage.getItem('regwiz-avatar-id');
       if (saved && AVATAR_OPTIONS.some((a) => a.id === saved)) return saved;
-    } catch {}
+    } catch { /* storage blocked */ }
     return DEFAULT_AVATAR_ID;
   });
-  useEffect(() => { try { localStorage.setItem('regwiz-avatar-id', avatarId); } catch {} }, [avatarId]);
+  useEffect(() => { try { localStorage.setItem('regwiz-avatar-id', avatarId); } catch { /* storage blocked */ } }, [avatarId]);
   const [appearance, setAppearance] = useState(() => {
     try { return localStorage.getItem('regwiz-appearance') === 'transparent' ? 'transparent' : 'standard'; } catch { return 'standard'; }
   });
-  const [reduceMotion, setReduceMotion] = useState(() => {
-    try {
-      const saved = localStorage.getItem('regwiz-reduce-motion');
-      if (saved != null) return saved === '1';
-    } catch {}
-    // no explicit choice yet — honor the OS setting instead of defaulting to "off"
-    try { return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false; } catch { return false; }
-  });
+  // the portal-wide setting from the account menu
+  const reduceMotion = useReducedMotion();
   const [textSize, setTextSize] = useState(() => {
     try { return localStorage.getItem('regwiz-text-size') || 'medium'; } catch { return 'medium'; }
   });
@@ -168,10 +163,10 @@ export default function FloatingAssistant() {
     try {
       const saved = localStorage.getItem('regwiz-avatar-size');
       if (saved && AVATAR_SIZE_SCALE[saved]) return saved;
-    } catch {}
+    } catch { /* storage blocked */ }
     return 'medium';
   });
-  useEffect(() => { try { localStorage.setItem('regwiz-avatar-size', avatarSize); } catch {} }, [avatarSize]);
+  useEffect(() => { try { localStorage.setItem('regwiz-avatar-size', avatarSize); } catch { /* storage blocked */ } }, [avatarSize]);
   // Effective box size the avatar renders/drags/docks at — everything downstream
   // (position math, panel/tip placement) reads AV_W/AV_H off this, not the base
   // constants, so picking a size actually resizes the whole floating widget.
@@ -182,15 +177,14 @@ export default function FloatingAssistant() {
   // near an edge at a smaller size — re-clamp whenever the size changes.
   useEffect(() => {
     setPos((p) => ({ ...p, top: Math.max(0, Math.min(window.innerHeight - AV_H, p.top)) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [AV_H]);
-  useEffect(() => { try { localStorage.setItem('regwiz-appearance', appearance); } catch {} }, [appearance]);
-  useEffect(() => { try { localStorage.setItem('regwiz-reduce-motion', reduceMotion ? '1' : '0'); } catch {} }, [reduceMotion]);
-  useEffect(() => { try { localStorage.setItem('regwiz-text-size', textSize); } catch {} }, [textSize]);
+  useEffect(() => { try { localStorage.setItem('regwiz-appearance', appearance); } catch { /* storage blocked */ } }, [appearance]);
+  useEffect(() => { try { localStorage.setItem('regwiz-text-size', textSize); } catch { /* storage blocked */ } }, [textSize]);
   const [autoSendVoice, setAutoSendVoice] = useState(() => {
     try { return localStorage.getItem('regwiz-auto-send-voice') !== '0'; } catch { return true; }
   });
-  useEffect(() => { try { localStorage.setItem('regwiz-auto-send-voice', autoSendVoice ? '1' : '0'); } catch {} }, [autoSendVoice]);
+  useEffect(() => { try { localStorage.setItem('regwiz-auto-send-voice', autoSendVoice ? '1' : '0'); } catch { /* storage blocked */ } }, [autoSendVoice]);
 
   // ── Backend sync — settings also live in the assistant_settings table,
   // keyed by user email, so they survive cleared browser storage / new devices.
@@ -209,7 +203,6 @@ export default function FloatingAssistant() {
         if (s) {
           if (s.avatar_id && AVATAR_OPTIONS.some((a) => a.id === s.avatar_id)) setAvatarId(s.avatar_id);
           if (s.appearance) setAppearance(s.appearance);
-          if (typeof s.reduce_motion === 'boolean') setReduceMotion(s.reduce_motion);
           if (s.text_size) setTextSize(s.text_size);
           if (s.avatar_size && AVATAR_SIZE_SCALE[s.avatar_size]) setAvatarSize(s.avatar_size);
           if (typeof s.auto_send_voice === 'boolean') setAutoSendVoice(s.auto_send_voice);
@@ -233,7 +226,6 @@ export default function FloatingAssistant() {
           body: JSON.stringify({
             avatar_id: avatarId,
             appearance,
-            reduce_motion: reduceMotion,
             text_size: textSize,
             avatar_size: avatarSize,
             auto_send_voice: autoSendVoice,
@@ -242,23 +234,22 @@ export default function FloatingAssistant() {
       })();
     }, 500); // debounce so rapid toggle changes don't spam the API
     return () => clearTimeout(t);
-  }, [userEmail, avatarId, appearance, reduceMotion, textSize, avatarSize, autoSendVoice, getAccessToken]);
+  }, [userEmail, avatarId, appearance, textSize, avatarSize, autoSendVoice, getAccessToken]);
 
   const TEXT_SIZE_PX = { small: 12, medium: 13, large: 15 };
   const clearConversation = () => {
     setMessages([]); setPendingAction(null); setCanRetry(false); setOpenSources(new Set());
-    try { sessionStorage.removeItem('regwiz-messages'); } catch {}
+    try { sessionStorage.removeItem('regwiz-messages'); } catch { /* storage blocked */ }
   };
   const resetAvatarPosition = () => {
     const d = { side: 'right', top: window.innerHeight - AV_H };
     setPos(d);
-    try { sessionStorage.removeItem('regwiz-pos'); } catch {}
+    try { sessionStorage.removeItem('regwiz-pos'); } catch { /* storage blocked */ }
   };
   const resetSettingsDefaults = () => {
     setAppearance('standard');
     setTextSize('medium');
     setAvatarSize('medium');
-    setReduceMotion(false);
     setAutoSendVoice(true);
     if (!voiceOn) setVoiceOn(true);
     setAvatarId(DEFAULT_AVATAR_ID);
@@ -393,7 +384,7 @@ export default function FloatingAssistant() {
   const speakLine = useCallback(async (text) => {
     const t = (text || '').trim();
     if (!voiceOnRef.current || !t) return false;
-    let r = false;
+    let r;
     try { r = await azure.speak(t, emotionRef.current, voiceNameRef.current); } catch { r = false; }
     if (r) return true;
     if (r === null) return false;         // stopped - stay silent, no fallback voice
@@ -452,8 +443,8 @@ export default function FloatingAssistant() {
   };
   const scrollToLatest = () => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
 
-  useEffect(() => { try { sessionStorage.setItem('regwiz-open', open ? '1' : '0'); } catch {} }, [open]);
-  useEffect(() => { try { sessionStorage.setItem('regwiz-pos', JSON.stringify(pos)); } catch {} }, [pos]);
+  useEffect(() => { try { sessionStorage.setItem('regwiz-open', open ? '1' : '0'); } catch { /* storage blocked */ } }, [open]);
+  useEffect(() => { try { sessionStorage.setItem('regwiz-pos', JSON.stringify(pos)); } catch { /* storage blocked */ } }, [pos]);
   useEffect(() => {
     // bounded — this is a reload-survival convenience, not a growing log. Keep
     // only the most recent messages so a very long session doesn't bloat
@@ -461,7 +452,7 @@ export default function FloatingAssistant() {
     try {
       const capped = messages.length > 60 ? messages.slice(-60) : messages;
       sessionStorage.setItem('regwiz-messages', JSON.stringify(capped));
-    } catch {}
+    } catch { /* quota full or storage blocked */ }
   }, [messages]);
 
   // ---- send ----
@@ -780,7 +771,7 @@ export default function FloatingAssistant() {
       basePanelTop: panelBox ? panelBox.top : null,
       moved: false, handle,
     };
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* pointer gone */ }
   };
   const onAvatarPointerDown = beginGroupDrag('avatar');
   const onPanelHeaderPointerDown = (e) => {
@@ -801,7 +792,7 @@ export default function FloatingAssistant() {
     const d = dragInfo.current;
     dragInfo.current = null;
     if (!d) return;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* not captured */ }
 
     if (!d.moved) {
       if (d.handle === 'avatar') {
@@ -829,7 +820,7 @@ export default function FloatingAssistant() {
     }));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [AV_H]);
 
   // Liquid-glass on the chat panel. The panel is conditionally rendered, so the
   // effect is keyed to `open`: attach when it mounts, destroy when it goes away.
@@ -899,7 +890,7 @@ export default function FloatingAssistant() {
 
       {open && (
         <div ref={panelRef}
-             className={`flex flex-col overflow-hidden ${appearance === 'transparent' ? 'regwiz-glass regwiz-glass--transparent' : 'regwiz-glass'} ${reduceMotion ? 'regwiz-reduce-motion' : ''}`}
+             className={`flex flex-col overflow-hidden ${appearance === 'transparent' ? 'regwiz-glass regwiz-glass--transparent' : 'regwiz-glass'}`}
              style={panelStyle}>
           <div className={settingsOpen
               ? 'flex flex-col touch-none'
@@ -1028,17 +1019,6 @@ export default function FloatingAssistant() {
               )}
               {settingsTab === 'behavior' && (
                 <div className="flex flex-col -mt-1">
-                  <div className="flex items-center justify-between py-3 border-b border-jj-gray-02">
-                    <div>
-                      <div className="text-sm font-johnson-text text-jj-gray-08">Reduce motion</div>
-                      <div className="text-[11px] font-johnson-text text-jj-gray-05">Stops waveform &amp; typing animations</div>
-                    </div>
-                    <button onClick={() => setReduceMotion((v) => !v)}
-                      role="switch" aria-checked={reduceMotion} aria-label="Reduce motion"
-                      className={`w-9 h-5 rounded-full relative transition-colors active:opacity-80 shrink-0 ${reduceMotion ? 'bg-jj-red' : 'bg-jj-gray-03 hover:bg-jj-gray-04'}`}>
-                      <span className={`absolute top-[2px] w-4 h-4 rounded-full bg-white transition-all ${reduceMotion ? 'right-[2px]' : 'left-[2px]'}`} />
-                    </button>
-                  </div>
                   <div className="flex items-center justify-between py-3 border-b border-jj-gray-02">
                     <div>
                       <div className="text-sm font-johnson-text text-jj-gray-08">Voice replies</div>
