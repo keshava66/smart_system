@@ -1046,6 +1046,13 @@ def _add(job, n, **kw):
     _touch(job)
 
 
+def _catalog_changed():
+    """Targets on either engine can gain schemas and tables: Data Studio's
+    explorers must not keep showing the old lists."""
+    sfqr.catalog_changed()
+    pgs.catalog_changed()
+
+
 def _run_job(job_id: str):
     with _jobs_lock:
         job = _jobs.get(job_id)
@@ -1111,6 +1118,7 @@ def _run_job(job_id: str):
                     _budget.give(need["pg"], need["sf"])
                 _history.save(job)
         _skip_rest(job)
+        _catalog_changed()      # before the job reads as finished
         with job["lock"]:
             statuses = {t["status"] for t in job["tables"].values()}
             if job["cancel_requested"]:
@@ -1130,6 +1138,7 @@ def _run_job(job_id: str):
         _log(job, "error", f"Shuttle failed: {e.detail if isinstance(e, HTTPException) else e}")
     finally:
         _skip_rest(job)
+        _catalog_changed()      # a failed or cancelled run may still have created schemas or tables
         if work_dir:
             shutil.rmtree(work_dir, ignore_errors=True)
         job["finished_at"] = time.time()

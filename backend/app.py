@@ -829,6 +829,13 @@ app.include_router(
     snowflake_router,
     dependencies=[Depends(require_permission("viewDataStudio", "runSnowflakeQueryRunner"))],
 )
+# Table Copier routes, same /api/snowflake prefix (edit snowflake_copier.py).
+from snowflake_copier import copy_router
+
+app.include_router(
+    copy_router,
+    dependencies=[Depends(require_permission("viewDataStudio", "runSnowflakeQueryRunner"))],
+)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Data Studio (Postgres) routes (separate file — edit postgres_studio.py) ─
@@ -5687,7 +5694,9 @@ def shutdown_event():
         logger.info("✅ BDC connections closed")
 
     try:
+        from snowflake_copier import shutdown as shutdown_copier
         from snowflake_query_runner import shutdown as shutdown_sfqr
+        shutdown_copier()
         shutdown_sfqr()
         logger.info("✅ Data Studio Snowflake connections closed")
     except Exception as e:

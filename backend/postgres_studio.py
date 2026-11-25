@@ -27,11 +27,15 @@ import postgres_query_runner as pgqr
 import shared_worksheets
 from auth import require_permission
 from snowflake_query_runner import (
-    ALL_OPS, EXPORT_FORMATS, ROWS_PAGE_MAX_SIZE, SET_OPS, TEXT_OPS,
-    CELL_MAX_CHARS, CELL_PREVIEW_CHARS, CellRequest, ColumnFilter, full_cell, MutateRequest, RowsRequest, SavedQueryRequest, TableRowsRequest, grid_rows,
-    _DuplicateRow, _MutationMismatch, _statement_result, confirm_detail, failed_at, numbered_sections, plan_statements, _cache_drop_prefix, _cache_get, _cache_set,
+    EXPORT_FORMATS, ROWS_PAGE_MAX_SIZE,
+    CELL_MAX_CHARS, CELL_PREVIEW_CHARS, CellRequest, full_cell, MutateRequest, RowsRequest, SavedQueryRequest, TableRowsRequest, grid_rows,
+    _DuplicateRow, _MutationMismatch, numbered_sections, _cache_drop_prefix, _cache_get, _cache_set,
     _change_summary, _dedupe_columns, _is_truncated, _key_columns_for, _paged_inline, _parse_json_param, ValuesRequest, inline_values,
-    _stream_rows, build_order_by, qualified, quote_ident,
+    _stream_rows,
+)
+from snowflake_sql import (
+    ALL_OPS, SET_OPS, TEXT_OPS, ColumnFilter, _statement_result, build_order_by, confirm_detail, failed_at, plan_statements,
+    qualified, quote_ident,
 )
 
 logger = logging.getLogger(__name__)
@@ -649,7 +653,7 @@ def _statement_job(job: Dict[str, Any], st: Dict[str, Any], started: float) -> D
     return {
         **{k: job[k] for k in ("owner", "shared_ws", "database", "session", "timeout_seconds", "created_at", "last_used", "slots")},
         "job_id": uuid.uuid4().hex, "sql": st["sql"], "statements": [st], "statement_results": [],
-        "lead_keyword": c.lead_keyword, "is_destructive": False, "returns_rows": True,
+        "lead_keyword": c.lead_keyword, "is_destructive": False, "changes_catalog": False, "returns_rows": True,
         "status": "success", "conn": None, "temp_table": None, "inline_rows": None,
         "columns": None, "row_count": None, "rows_affected": None, "error": None,
         "started_at": started, "finished_at": None, "done": _DONE, "cancel_requested": False,
@@ -744,6 +748,9 @@ def _run_job(job_id: str):
                 s["conn"] = None
             elif job.get("closed"):
                 _drop_temp(s)
+    # Before done is set, so a client told "finished" never reads a stale list.
+    if job["changes_catalog"]:
+        catalog_changed()
     job["done"].set()
     job["slots"].release()
 
@@ -755,6 +762,7 @@ def _job_status(job: Dict[str, Any]) -> Dict[str, Any]:
         "statement_type": job["lead_keyword"],
         "returns_rows": job["returns_rows"],
         "is_destructive": job["is_destructive"],
+        "changes_catalog": job["changes_catalog"],
         "columns": job["columns"],
         "row_count": job["row_count"],
         "rows_affected": job["rows_affected"],
@@ -906,6 +914,20 @@ def health(conn_id: Optional[str] = Query(None), auth: dict = Depends(require_pe
         "max_page_size": ROWS_PAGE_MAX_SIZE,
         "write_profile": {"configured": False},
     }
+
+
+def catalog_changed():
+    """Objects were created, dropped, renamed or written to: forget the cached
+    database, schema, table, column and search lists, for every login."""
+    for prefix in ("pg-studio-", "pg-colmeta:", "pg-search:"):
+        _cache_drop_prefix(prefix)
+
+
+@pg_studio_router.post("/catalog/refresh")
+def refresh_catalog(auth: dict = Depends(require_permission(PERM))):
+    """The explorer's Refresh button: picks up objects changed outside Data Studio."""
+    catalog_changed()
+    return {"ok": True}
 
 
 @pg_studio_router.get("/databases")
@@ -1118,6 +1140,8 @@ def start_query(body: PgQueryRequest, conn_id: Optional[str] = Query(None), auth
         "session": session,
         "lead_keyword": last.lead_keyword,
         "is_destructive": bool(risky),
+        # COMMIT is when DDL from an open transaction becomes visible to the explorer.
+        "changes_catalog": bool(risky) or any(p["cls"].lead_keyword in ("COMMIT", "END") for p in planned),
         "returns_rows": last.returns_rows,
         "timeout_seconds": timeout,
         "status": "running",

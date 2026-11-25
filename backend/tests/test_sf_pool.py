@@ -527,3 +527,82 @@ def test_pg_edit_matches_a_row_whose_big_value_was_cut_short(pgs):
                           conn_id=None, auth=A)
     assert done["total"] == 1
     _pg_run(P, A, "drop table ds_nokey", "ws-edit")
+
+
+def test_sf_ddl_run_drops_cached_object_lists(monkeypatch):
+    """A CREATE / DROP / ALTER must show in the explorer straight away, not
+    after the 5 minute metadata cache runs out."""
+    import threading
+    import snowflake_query_runner as S
+
+    class Conn(_SfConn):
+        def cursor(self):
+            class Cur:
+                description, rowcount, sfqid = None, 1, "q1"
+
+                def execute(self, sql, params=None):
+                    pass
+
+                def fetchall(self):
+                    return []
+
+                def close(self):
+                    pass
+            return Cur()
+
+    monkeypatch.setattr(S, "_pool", S._ConnectionPool())
+    monkeypatch.setattr(S._pool, "acquire", lambda *a, **k: (Conn(), "k", _time.time()))
+    monkeypatch.setattr(S, "_apply_statement_timeout", lambda *a, **k: None)
+    monkeypatch.setattr(S, "_cache", {})
+    monkeypatch.setattr(S, "_name_index", {"read": {"items": [], "parts": [], "built": _time.time(), "building": False}})
+
+    def run(sql):
+        planned = S.plan_statements(sql)
+        job = S._new_job(planned[-1]["cls"], "DB", "SC", None, 60, "a@x.com")
+        job.update(statements=planned, statement_results=[], slots=threading.Semaphore(0), profile=S.READ_PROFILE,
+                   shared_ws=None, is_destructive=any(p["cls"].is_destructive for p in planned))
+        S._run_job(job["job_id"])
+        S._jobs.pop(job["job_id"], None)
+        return job
+
+    for key in ("sf-tables:read:DB:SC", "sf-schemas:read:DB", "sf-roles:read"):
+        S._cache_set(key, ["old"])
+    job = run("select 1")
+    assert S._cache_get("sf-tables:read:DB:SC") == ["old"] and S._name_index     # a read changes nothing
+    assert not S._job_status_payload(job)["changes_catalog"]
+
+    job = run("create table db.sc.new_t (a int)")
+    assert job["status"] == "success", job["error"]
+    assert S._job_status_payload(job)["changes_catalog"]
+    assert S._cache_get("sf-tables:read:DB:SC") is None and S._cache_get("sf-schemas:read:DB") is None
+    assert S._cache_get("sf-roles:read") == ["old"]                                # roles don't change with objects
+    assert S._name_index == {}
+
+    S._name_index["read"] = {"items": [], "parts": [], "built": _time.time(), "building": False}
+    S._cache_set("sf-tables:read:DB:SC", ["old"])
+    job = run("insert into db.sc.new_t values (1)")
+    assert S._job_status_payload(job)["changes_catalog"]
+    assert S._cache_get("sf-tables:read:DB:SC") is None                            # row counts moved
+    assert "read" in S._name_index                                                 # names didn't
+
+
+def test_sf_name_index_built_before_a_change_is_not_kept(monkeypatch):
+    import snowflake_query_runner as S
+    monkeypatch.setattr(S, "_name_index", {})
+
+    def build(which, dbs):
+        S.catalog_changed()            # a table is created while the index is being read
+        return [("DB", "SC", "T", "table", "t", ["t"])]
+    monkeypatch.setattr(S, "_build_name_index", build)
+    entry = S._refresh_index("read", ["DB"])
+    assert entry["items"] and "read" not in S._name_index     # this search uses it, the next one rebuilds
+
+
+def test_pg_catalog_changed_drops_explorer_and_search_lists(monkeypatch):
+    import snowflake_query_runner as S
+    import postgres_studio as P
+    monkeypatch.setattr(S, "_cache", {})
+    for key in ("pg-studio-tables:c1:db:public", "pg-colmeta:c1:db:public:t", "pg-search:c1:abc", "sf-roles:read"):
+        S._cache_set(key, ["old"])
+    P.catalog_changed()
+    assert [k for k in S._cache] == ["sf-roles:read"]

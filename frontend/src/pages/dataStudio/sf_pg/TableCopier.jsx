@@ -125,7 +125,7 @@ const ProgressBar = ({ pct, tone = C.primary }) => (
 
 /* --------------------------------- main ----------------------------------- */
 
-export default function TableCopier({ serverInfo }) {
+export default function TableCopier({ serverInfo, catalogVersion = 0, onFinished }) {
   // Where writes go through a second Snowflake login, the target side of the
   // form has to be browsed with those credentials - the two logins do not see
   // the same databases, which is the whole reason for the split.
@@ -163,6 +163,13 @@ export default function TableCopier({ serverInfo }) {
   const [excluded, setExcluded] = useState(() => new Set());
 
   const [job, setJob] = useState(null);           // live/completed job status payload
+  // A copy that stops running (whatever the outcome) may have created objects.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    const running = job?.status === 'running';
+    if (wasRunning.current && !running) onFinished?.();
+    wasRunning.current = running;
+  }, [job?.status, onFinished]);
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -184,19 +191,17 @@ export default function TableCopier({ serverInfo }) {
       .catch(e => { if (!cancelled) setFormError(e.message); })
       .finally(() => { if (!cancelled) setLoadingDbs(false); });
     return () => { cancelled = true; };
-  }, [targetProfile]);
+  }, [targetProfile, catalogVersion]);
 
-  const loadSchemas = useCallback((db, profile = 'read') => {
+  const fetchSchemas = useCallback((db, profile) => {
     const key = `${profile}:${db}`;
-    if (!db || schemaCache[key]) return;
     fetchJson(`/api/snowflake/schemas?database=${encodeURIComponent(db)}&profile=${profile}`)
       .then(d => setSchemaCache(prev => ({ ...prev, [key]: d.schemas || [] })))
       .catch(() => setSchemaCache(prev => ({ ...prev, [key]: [] })));
-  }, [schemaCache]);
+  }, []);
 
-  const loadTables = useCallback((db, schema, profile = 'read') => {
+  const fetchTables = useCallback((db, schema, profile) => {
     const key = `${profile}:${db}:${schema}`;
-    if (!db || !schema || tableCache[key]) return;
     fetchJson(`/api/snowflake/tables?database=${encodeURIComponent(db)}&schema=${encodeURIComponent(schema)}&profile=${profile}`)
       .then(d => setTableCache(prev => ({
         ...prev,
@@ -205,7 +210,28 @@ export default function TableCopier({ serverInfo }) {
         [key]: (d.tables || []).filter(t => t.kind !== 'external_table'),
       })))
       .catch(() => setTableCache(prev => ({ ...prev, [key]: [] })));
-  }, [tableCache]);
+  }, []);
+
+  const loadSchemas = useCallback((db, profile = 'read') => {
+    if (db && !schemaCache[`${profile}:${db}`]) fetchSchemas(db, profile);
+  }, [schemaCache, fetchSchemas]);
+
+  const loadTables = useCallback((db, schema, profile = 'read') => {
+    if (db && schema && !tableCache[`${profile}:${db}:${schema}`]) fetchTables(db, schema, profile);
+  }, [tableCache, fetchTables]);
+
+  // Objects changed (a copy finished, a run in a worksheet, the explorer's
+  // Refresh): forget the lists and re-read the ones the form is showing.
+  const seenVersion = useRef(catalogVersion);
+  useEffect(() => {
+    if (seenVersion.current === catalogVersion) return;
+    seenVersion.current = catalogVersion;
+    setSchemaCache({});
+    setTableCache({});
+    if (form.sourceDatabase) fetchSchemas(form.sourceDatabase, 'read');
+    if (form.sourceDatabase && form.sourceSchema) fetchTables(form.sourceDatabase, form.sourceSchema, 'read');
+    if (form.targetDatabase) fetchSchemas(form.targetDatabase, targetProfile);
+  }, [catalogVersion, form.sourceDatabase, form.sourceSchema, form.targetDatabase, targetProfile, fetchSchemas, fetchTables]);
 
   const set = (patch) => setForm(f => ({ ...f, ...patch }));
 
