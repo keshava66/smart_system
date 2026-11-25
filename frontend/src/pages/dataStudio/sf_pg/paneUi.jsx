@@ -247,30 +247,36 @@ export function RunBar({ dark, accent, busy, othersBusy, status, meta, elapsed, 
   );
 }
 
-// Top of the explorer: which engine, which account, and as whom.
+// Top of the explorer, one compact strip: the user it signs in as, the
+// connection status, and (when there is a choice) connection / role pickers.
 export function ConnCard({ E, state, info, conn, connections, connId, onConn, role, roleOptions, roleKey, onRole, roleLabel, writesOk }) {
-  // The user it signs in as. The server address and Snowflake account aren't much use here.
-  const where = conn?.user || info?.user;
+  // The server address and Snowflake account aren't much use here.
+  const user = conn?.user || info?.user;
   const look = state === 'ready' ? ['#286d10', 'Connected', true] : state === 'checking' ? ['#a14a00', 'Connecting', false] : ['#9e0000', state === 'unconfigured' ? 'Not set up' : 'Offline', false];
   const chip = (k, v, warn) => (
     <span className={`inline-flex items-center gap-1.5 max-w-full h-[24px] px-2.5 rounded-full border text-[11.5px] ${warn ? 'bg-[#fff3ea] border-[#f6dfcc] text-[#a14a00]' : 'bg-white border-black/[.06] text-[#312c2a]'}`}>
       {k && <span className="text-[#766a63]">{k}</span>}<span className="truncate">{v}</span>
     </span>
   );
+  const pickers = !E.pickDb || (connections.length > 1 && onConn) || !writesOk;
   return (
-    <div className="flex-shrink-0 mx-3 mt-3 mb-1 px-3.5 py-3 rounded-[12px] transition-colors" style={{ background: E.soft }}>
-      <div className="flex items-start gap-2.5">
-        <img src={E.icon} alt="" className="w-[22px] h-[22px] mt-[2px] flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <div className="font-johnson-display font-bold text-[16px] leading-tight text-[#312c2a]">{E.label}</div>
-          <div className="truncate text-[11.5px] text-[#6e6259]" title={where || ''}>{where || (state === 'checking' ? 'Reaching the server...' : state === 'unconfigured' ? 'Not configured' : 'Server not reachable')}</div>
-        </div>
-        <span className="flex-shrink-0 inline-flex items-center gap-1.5 mt-[3px] text-[11px] font-medium" style={{ color: look[0] }}>
-          <span className={`w-[7px] h-[7px] rounded-full ${look[2] ? 'ds-live' : ''}`} style={{ background: look[0] }} />{look[1]}
+    <div className="flex-shrink-0 px-4 py-2 border-b border-[#e8e6e3] transition-colors" style={{ background: E.soft }} aria-label={`${E.label} connection`}>
+      <div className="flex items-center gap-2 min-w-0 h-[24px]">
+        {user ? (
+          <span className="flex-1 min-w-0 truncate text-[12px] text-[#312c2a]" title={user}>
+            <span className="text-[#766a63]">User: </span><span className="font-medium">{user}</span>
+          </span>
+        ) : (
+          <span className="flex-1 min-w-0 truncate text-[12px] text-[#766a63]">
+            {state === 'checking' ? 'Reaching the server...' : state === 'unconfigured' ? 'Not configured' : 'Server not reachable'}
+          </span>
+        )}
+        <span className="flex-shrink-0 inline-flex items-center gap-1.5 text-[11px] font-medium" style={{ color: look[0] }} role="status">
+          <span className={`w-[7px] h-[7px] rounded-full ${look[2] ? 'ds-live' : ''}`} style={{ background: look[0] }} aria-hidden="true" />{look[1]}
         </span>
       </div>
-      {(!E.pickDb || (connections.length > 1 && onConn) || !writesOk) && (
-      <div className="flex flex-wrap items-center gap-1.5 mt-2.5 min-w-0">
+      {pickers && (
+      <div className="flex flex-wrap items-center gap-1.5 mt-1.5 min-w-0">
         {E.pickDb ? (
           connections.length > 1 && onConn ? (
             <Picker size="sm" variant="chip" prefix="Connection" value={connId || ''} onChange={e => onConn(e.target.value)} title="Connection this worksheet runs on" aria-label="Login" className="max-w-full">

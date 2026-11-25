@@ -32,7 +32,15 @@ afterEach(() => {
   host.remove();
   calls.length = 0;
   schemas = ['PUBLIC'];
+  localStorage.clear();
 });
+
+const mount = (props) => {
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  render(props);
+};
 
 it('reads live lists and re-reads what is expanded when objects change', async () => {
   host = document.createElement('div');
@@ -68,4 +76,31 @@ it('Refresh clears the server cache, then tells the pane', async () => {
   await flush();
   expect(calls).toContain('POST /api/snowflake/catalog/refresh');
   expect(onRefresh).toHaveBeenCalledTimes(1);
+});
+
+it('comes back expanded, scrolled and selected after a browser reload', async () => {
+  const onSelect = vi.fn();
+  mount({ catalogVersion: 0, onSelect });
+  await flush();
+  const db = [...host.querySelectorAll('[role="treeitem"]')].find(el => el.textContent.includes('DB1'));
+  await act(async () => db.click());
+  await flush();
+  const sel = onSelect.mock.calls.at(-1)[0];
+  render({ catalogVersion: 0, onSelect, selected: sel });
+  const tree = host.querySelector('[role="tree"]');
+  tree.scrollTop = 120;
+  await act(async () => { tree.dispatchEvent(new Event('scroll')); await new Promise(r => setTimeout(r, 250)); });
+
+  act(() => root.unmount());              // the reload
+  host.remove();
+  calls.length = 0;
+  schemas = ['PUBLIC', 'STAGING'];
+  const onSelect2 = vi.fn();
+  mount({ catalogVersion: 0, onSelect: onSelect2 });
+  await flush();
+  await flush();
+  expect(calls).toContain('GET /api/snowflake/schemas?database=DB1&bypass_cache=true');   // read fresh, no click
+  expect(text()).toContain('STAGING');
+  expect(onSelect2).toHaveBeenCalledWith(sel);
+  expect(host.querySelector('[role="tree"]').scrollTop).toBe(120);
 });

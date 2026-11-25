@@ -307,8 +307,17 @@ const tipNeeded = (el) => {
   return !(el.innerText || el.value || '').trim();
 };
 
-function TipLayer({ children }) {
+// Inside [data-tip-delay] (the explorer tree) a tip waits this long, so
+// running the pointer down the tree doesn't flash one per row. Moving on
+// from a tip that was showing (within TIP_WARM_MS) skips the wait.
+const TIP_DELAY_MS = 500;
+const TIP_WARM_MS = 300;
+
+export function TipLayer({ children }) {
   const [text, setText] = useState(null);
+  const shown = useRef(false);
+  const warmUntil = useRef(0);
+  const timer = useRef(0);
   const boxRef = useRef(null);
   const elRef = useRef(null);
   const at = useRef({ x: 0, y: 0 });
@@ -337,7 +346,14 @@ function TipLayer({ children }) {
     place();
   }, [text, place]);
 
-  const hide = useCallback(() => { elRef.current = null; setText(null); }, []);
+  const show = useCallback((tip) => { shown.current = !!tip; setText(tip); }, []);
+  const hide = useCallback(() => {
+    clearTimeout(timer.current);
+    if (shown.current) warmUntil.current = Date.now() + TIP_WARM_MS;
+    shown.current = false;
+    elRef.current = null;
+    setText(null);
+  }, []);
   // Once you click something its tip has done its job; it stays away until
   // the pointer leaves that element.
   const pressed = useRef(null);
@@ -363,7 +379,13 @@ function TipLayer({ children }) {
     elRef.current = el;
     if (tip && tip.length > 300) tip = `${tip.slice(0, 300)}…`;
     at.current = { x: e.clientX, y: e.clientY };
-    setText(tip);
+    clearTimeout(timer.current);
+    const warm = shown.current || Date.now() < warmUntil.current;
+    if (tip && !warm && el.closest('[data-tip-delay]')) {
+      timer.current = setTimeout(() => { if (elRef.current === el) show(tip); }, TIP_DELAY_MS);
+      return;
+    }
+    show(tip);
   };
 
   const onMove = (e) => {
@@ -390,7 +412,7 @@ function TipLayer({ children }) {
     };
   }, [text, hide]);
 
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  useEffect(() => () => { cancelAnimationFrame(frame.current); clearTimeout(timer.current); }, []);
 
   return (
     <div className="contents" onPointerOver={onOver} onPointerMove={onMove} onPointerOut={onOut} onPointerDownCapture={onDown}>
@@ -2018,9 +2040,8 @@ function StudioPane({ active: paneActive = true }) {
     return (
       <div className="h-full flex overflow-hidden bg-[#efedea] font-johnson-text" aria-busy="true">
         <div className="hidden lg:flex w-[288px] flex-shrink-0 flex-col bg-white border-r border-[#e8e6e3]">
-          <div className="mx-3 mt-3 mb-1 px-3.5 py-3 rounded-[12px] space-y-2.5" style={{ background: E.soft }}>
-            <div className="flex items-center gap-2.5"><img src={E.icon} alt="" className="w-[22px] h-[22px]" /><Skel w={90} h={12} /></div>
-            <Skel w="60%" h={20} className="!rounded-full" />
+          <div className="px-4 py-2 border-b border-[#e8e6e3] flex items-center gap-2 h-[41px]" style={{ background: E.soft }}>
+            <Skel w={120} h={10} /><Skel w={64} h={10} className="ml-auto" />
           </div>
           <div className="p-3"><Skel h={32} className="rounded-md" /></div>
           <div className="px-4 space-y-3 pt-1">{Array.from({ length: 8 }).map((_, i) => <Skel key={i} w={`${50 + ((i * 29) % 45)}%`} h={10} />)}</div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ChevronRight, Code2, Copy, Database, ArrowRightToLine, Eye, Info, KeyRound, Layers, Loader2, PanelLeftClose, Pencil, Play, RefreshCw,
   RotateCcw, Search, Table2, X,
@@ -240,6 +240,19 @@ const Act = ({ icon, label, onClick }) => {
   );
 };
 
+// What the tree looked like (expanded nodes, how each was read, scroll and
+// selection), per engine and login/role, so a reload puts it back.
+const PICK = { schemas: d => d.schemas || [], tables: d => d.tables || [], columns: d => d.columns || [] };
+const readTree = (key) => {
+  try {
+    const t = JSON.parse(window.localStorage.getItem(key) || 'null');
+    return t && Array.isArray(t.open) && Array.isArray(t.loads) ? t : null;
+  } catch { return null; }
+};
+const writeTree = (key, tree) => {
+  try { window.localStorage.setItem(key, JSON.stringify(tree)); } catch { /* storage full or blocked */ }
+};
+
 export function SfExplorer({
   onInsert, onPreview, onEditData, onShowDdl, onCollapse, onSelect, selected,
   reveal, logInPage, canEdit = true, onToast, cq = '', onDetails, catalogVersion = 0, onRefresh,
@@ -248,7 +261,10 @@ export function SfExplorer({
   const [databases, setDatabases] = useState(null);
   const [dbError, setDbError] = useState(null);
   const [search, setSearch] = useState('');
-  const [open, setOpen] = useState(() => new Set());
+  const treeKey = `${E.store}.explorerTree.${cq || 'default'}`;
+  const saved = useRef(undefined);
+  if (saved.current === undefined) saved.current = readTree(treeKey);
+  const [open, setOpen] = useState(() => new Set(saved.current?.open || []));
   const cache = useRef({ schemas: {}, tables: {}, columns: {} });
   const [, tick] = useState(0);
   const rerender = useCallback(() => tick(t => t + 1), []);
@@ -261,7 +277,23 @@ export function SfExplorer({
   const req = useRef({ schemas: {}, tables: {}, columns: {} });
   const seq = useRef({ databases: 0 });
   const openRef = useRef(open);
-  useEffect(() => { openRef.current = open; }, [open]);
+  const scrollTop = useRef(saved.current?.scroll || 0);
+  const selectedRef = useRef(selected);
+  const persist = useCallback(() => {
+    const loads = [];
+    for (const bucket of Object.keys(req.current)) {
+      for (const [key, r] of Object.entries(req.current[bucket])) {
+        if (openRef.current.has(r.openKey)) loads.push({ bucket, key, url: r.url, openKey: r.openKey });
+      }
+    }
+    writeTree(treeKey, { open: [...openRef.current], loads, scroll: scrollTop.current, selected: selectedRef.current || null });
+  }, [treeKey]);
+  useEffect(() => { openRef.current = open; persist(); }, [open, persist]);
+  useEffect(() => {
+    if (!selected || selected === selectedRef.current) return;
+    selectedRef.current = selected;
+    persist();
+  }, [selected, persist]);
 
   const loadDatabases = useCallback(() => {
     const n = ++seq.current.databases;
@@ -277,15 +309,18 @@ export function SfExplorer({
     const store = cache.current[bucket];
     if (!force && store[key] !== undefined && !(store[key] instanceof Error)) return;
     req.current[bucket][key] = { url, pick, openKey };
+    persist();
     const id = `${bucket}|${key}`;
     const n = (seq.current[id] || 0) + 1;
     seq.current[id] = n;
-    store[key] = 'loading';
+    // A re-read keeps showing what was there until the answer lands, so the
+    // tree doesn't collapse to skeletons and lose its scroll position.
+    if (!(force && Array.isArray(store[key]))) store[key] = 'loading';
     rerender();
     fetchJson(url)
       .then(data => { if (seq.current[id] === n) { store[key] = pick(data); rerender(); } })
       .catch(err => { if (seq.current[id] === n) { store[key] = err; rerender(); } });
-  }, [rerender]);
+  }, [rerender, persist]);
 
   const loadSchemas = useCallback((db, force) => load('schemas', db,
     withQs(`${E.api}/schemas?database=${enc(db)}&bypass_cache=true`, cq), d => d.schemas || [], force, `d:${db}`), [load, E.api, cq]);
@@ -295,6 +330,18 @@ export function SfExplorer({
   const loadColumns = useCallback((db, schema, table, force) => load('columns', `${db}.${schema}.${table}`,
     withQs(`${E.api}/columns?database=${enc(db)}&schema=${enc(schema)}&table=${enc(table)}&bypass_cache=true`, cq), d => d.columns || [],
     force, `t:${db}.${schema}.${table}`), [load, E.api, cq]);
+
+  // Put back what was expanded before the reload, read fresh, and the selection.
+  useEffect(() => {
+    const t = saved.current;
+    if (!t) return;
+    for (const l of t.loads) {
+      if (PICK[l.bucket] && typeof l.url === 'string' && openRef.current.has(l.openKey)) load(l.bucket, l.key, l.url, PICK[l.bucket], true, l.openKey);
+    }
+    if (t.selected && !selectedRef.current) onSelect?.(t.selected);
+    // once, on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Re-read everything that is expanded, keeping the tree as it is. What is
   // collapsed is forgotten and read fresh when it is opened again.
@@ -449,6 +496,30 @@ export function SfExplorer({
   // After a search hit is opened, wait for its schema to load and the row
   // to render, then scroll the tree so the row sits in the middle.
   const treeRef = useRef(null);
+
+  // Scroll: saved as you scroll; after a reload it is put back once the
+  // restored nodes have all loaded, so rows above it are already in place.
+  // Touching the tree first cancels that.
+  const pendingScroll = useRef(scrollTop.current > 0 ? scrollTop.current : null);
+  const saveTimer = useRef(0);
+  useLayoutEffect(() => {
+    const box = treeRef.current;
+    const want = pendingScroll.current;
+    if (want == null || !box || !databases) return;
+    const busy = Object.values(cache.current).some(b => Object.values(b).includes('loading'));
+    if (!busy) {
+      box.scrollTop = want;
+      pendingScroll.current = null;
+    }
+  });
+  const onTreeScroll = () => {
+    if (pendingScroll.current != null) return;
+    scrollTop.current = treeRef.current?.scrollTop || 0;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(persist, 200);
+  };
+  const stopRestore = () => { pendingScroll.current = null; };
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
   const scrollTo = useRef(null);
   const scrollToFq = useCallback((fq) => {
     clearInterval(scrollTo.current);
@@ -495,7 +566,7 @@ export function SfExplorer({
 
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white">
+    <div className="flex flex-col h-full min-h-0 bg-white" data-tip-delay>
       <div className="flex-shrink-0 flex items-center gap-2 h-[44px] pl-4 pr-2 border-b border-[#e8e6e3]">
         <Database size={15} strokeWidth={2} className="text-[var(--sig-ink)] flex-shrink-0" />
         <span className="text-[13px] font-bold text-[#312c2a] truncate">Databases</span>
@@ -575,7 +646,8 @@ export function SfExplorer({
         </div>
       )}
 
-      <div ref={treeRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-3" role="tree" aria-label={`${E.label} objects`}>
+      <div ref={treeRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-3" role="tree" aria-label={`${E.label} objects`}
+        onScroll={onTreeScroll} onWheel={stopRestore} onPointerDown={stopRestore} onKeyDown={stopRestore} onTouchStart={stopRestore}>
         {databases === null && !dbError && <TreeSkeleton depth={0} count={7} />}
         {dbError && <NodeError error={dbError} depth={0} onRetry={loadDatabases} />}
         {databases && databases.length === 0 && <NodeNote depth={0}>No databases visible to this role.</NodeNote>}

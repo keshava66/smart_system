@@ -78,16 +78,17 @@ EXPECTED = {
     "frontend/src/pages/dataStudio/panes.js": "a5251cd9bee298b914b8c4242a943928b8a75cc71c82cb40b7746ba1e835c78a",
     "frontend/src/pages/dataStudio/sf_pg/TableCopier.jsx": "028a80d5657573ac11a428680b1aca1a5c34aebe345eb062483978bfdfb2b446",
     "frontend/src/pages/dataStudio/sf_pg/editor.jsx": "cd6369e0978c3847179414fbddcb8fb9f359586413dfa32c43b9dccd3f9bee80",
-    "frontend/src/pages/dataStudio/sf_pg/explorer.jsx": "c4298be53f28a01f1e602a4370262c1a6c77c4266c01722ffa50a9fc0ce4c5aa",
+    "frontend/src/pages/dataStudio/sf_pg/explorer.jsx": "03be8093eb0d4cb5899f1e8454c4fbe158be116db2c44f09bf82d5bab4f44e20",
     "frontend/src/pages/dataStudio/sf_pg/grid.jsx": "90cede707c3f13202c3dab833e861801608f636c35e130f5f348c5a3f37eee17",
     "frontend/src/pages/dataStudio/sf_pg/paneLib.js": "466939ab17e92c378fce8f64a5d55b76399cbfc3d4a66a70a3281fe728b8918c",
-    "frontend/src/pages/dataStudio/sf_pg/paneUi.jsx": "c7e9830f6bb7aa36b6aeb54f7182c7552948f788a88a04739a6bfdaacc3b86eb",
-    "frontend/src/pages/dataStudio/sf_pg/sf_pg_pane.jsx": "7faf895ca393f6d78d43a763b35e687ab8e025f77c7a51fab255a586f9e6d2e9",
+    "frontend/src/pages/dataStudio/sf_pg/paneUi.jsx": "716d31cb1262c96e51b46cf2f2797918be32cb8ed16b1611ee02f32754cd4f90",
+    "frontend/src/pages/dataStudio/sf_pg/sf_pg_pane.jsx": "5731b2d9bcbf67a815aed8f8d52b4201484c435acafe26ce1c179efcee58b58a",
     "frontend/src/pages/dataStudio/shared/studioHelpers.jsx": "6c0bbefcc87e1c872343b57122ad7ab57997dbc16e946c75437d0ec3cea29362",
     "frontend/src/pages/userManagement/access.js": "7c6f16204a8fb58d9a6af582e4656ffe9f7827abd4e4e0f97b2b16d558c0f363",
     "frontend/tests/bdc.test.jsx": "78ecdf7e8560fbfec50962b8baddaf66ba7d867cdaca235476caf4f8e5c987ec",
     "frontend/tests/dqe.test.jsx": "455ac719038fa7b7bc625898f50d8069a6e7da5f562a4bfb84cbe232b31f6ee9",
-    "frontend/tests/studioExplorer.test.jsx": "2c3d90405c8aedd65f1265c24033a71ef10ffe5ad5ce871acf3449f650202c29",
+    "frontend/tests/studioExplorer.test.jsx": "0270586122d784c48bcb14741af77d200258fe0a880107dbc5c18dca2d0b4066",
+    "frontend/tests/studioTips.test.jsx": "87b7200017b75a6e468bf435d09bbdc6f799dfe54223f7c8a2433715800f432f",
 }
 
 TABLES = [
