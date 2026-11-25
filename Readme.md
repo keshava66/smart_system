@@ -119,7 +119,7 @@ SmartHub/
 │   │   │   │   ├── indexer.jsx        # Index Health tab (+ indexer.css)
 │   │   │   │   ├── s3/S3Pane.jsx
 │   │   │   │   ├── shared/            # studioParts.jsx, studioHelpers.js
-│   │   │   │   ├── sf_pg/             # sf_pg_pane.jsx (the pane), editor, grid, explorer, paneUi, paneLib, TableCopier
+│   │   │   │   ├── sf_pg/             # sf_pg_pane.jsx (the pane), editor, grid, explorer, valueViewer, paneUi, paneLib, TableCopier
 │   │   │   │   ├── DataStudio.jsx     # tab bar
 │   │   │   │   ├── panes.js           # list of tabs
 │   │   │   │   └── useInPageLog.js

@@ -13,7 +13,7 @@ import { apiEventSource, apiFetch, downloadFile } from '../../../utils/apiClient
 import { SharedSession } from './collab';
 import { useInPageLog } from '../useInPageLog';
 import { useRBAC } from '../../../context/RBACContext';
-import { cellText, EXPORT_FORMATS, fetchJson, formatBytes, formatWhen, leadKeywordHint, PAGE_SIZE_OPTIONS } from '../shared/studioHelpers';
+import { cellText, EXPORT_FORMATS, fetchJson, formatWhen, leadKeywordHint, PAGE_SIZE_OPTIONS } from '../shared/studioHelpers';
 import {
   displayType, EngineCtx, ENGINES, firstName, fmtMs, fmtN, isBig, MOD, NF, plural, sigVars, statementSpans, T, typeFamily, useEngine, withQs,
 } from './paneLib';
@@ -25,6 +25,7 @@ import {
 import { SfExplorer, TableDetails } from './explorer';
 import { FilterBar, FilterButton, Floating, SfGrid } from './grid';
 import { SfEditor } from './editor';
+import { ValueViewer } from './valueViewer';
 
 const NF4 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
 
@@ -938,6 +939,7 @@ function StudioPane({ active: paneActive = true }) {
     return PAGE_SIZE_OPTIONS.includes(stored) ? stored : 100;
   });
   const [cellDetail, setCellDetail] = useState(null);
+  const closeCell = useCallback(() => setCellDetail(null), []);
   const [cellStats, setCellStats] = useState(null);    // the grid's selected block: count, sum, avg...
   // How to fetch the whole of a cell the grid only had the start of: by its
   // place in the result page, or in the data editor by primary key (Postgres).
@@ -2683,9 +2685,8 @@ function StudioPane({ active: paneActive = true }) {
                         dupRows={dupInfo.rows}
                         onOpenCell={(col, value, r) => setCellDetail({
                           title: col,
-                          body: isBig(value)
-                            ? `${value.preview}\n\n… only the first ${fmtN(value.preview.length)} characters of ${formatBytes(value.size)} are shown here. Use Load full value to see all of it.`
-                            : cellText(value) ?? 'NULL',
+                          value,
+                          type: (view.columns || []).find(c => c.name === col)?.type || null,
                           loadFull: isBig(value) ? cellLoader(col, r) : undefined,
                         })}
                         onCopied={(msg) => toast(msg || 'Cell copied', 'success', 1500)}
@@ -2994,14 +2995,7 @@ function StudioPane({ active: paneActive = true }) {
         }}
       />
       <TextModal title={textModal?.title} subtitle={textModal?.subtitle} body={textModal?.body} sql={textModal?.body !== 'Loading DDL...'} onClose={() => setTextModal(null)} />
-      <TextModal
-        title={cellDetail?.title}
-        subtitle="Cell value"
-        body={cellDetail?.body}
-        loadFull={cellDetail?.loadFull}
-        fileName={cellDetail?.title}
-        onClose={() => setCellDetail(null)}
-      />
+      <ValueViewer cell={cellDetail} onClose={closeCell} />
       <Modal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} width={440} labelledBy="sf-keys-title">
         <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#e8e6e3]">
           <Keyboard size={17} className="text-[var(--sig-ink)]" />
