@@ -1,0 +1,14 @@
+#!/bin/bash
+# Copy to start_backend.sh next to the backend/ folder and make it executable:
+#   cp start_backend.sh.example start_backend.sh && chmod +x start_backend.sh
+# Settings (port, python, certificates) live in backend/.env.server.
+set -euo pipefail
+
+cd "$(dirname "$(readlink -f "$0")")/backend"
+
+if [ ! -f .env.server ]; then
+  echo "Missing backend/.env.server. Copy backend/.env.server.example and fill it in." >&2
+  exit 1
+fi
+
+exec scripts/backend.sh start

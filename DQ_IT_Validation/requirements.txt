@@ -1,0 +1,19 @@
+# Same versions as backend/requirements.txt (the portal runs these scripts).
+# This is also the "validation Python" (scripts.python_path): Pipeline Studio's
+# runner, backend/pipeline_validation.py, runs here and loads the SQL Server driver.
+snowflake-connector-python~=5.2.0
+cryptography~=50.0.2
+oracledb~=26.1.0
+paramiko~=5.1.0
+requests~=2.34.2
+pytz~=2026.6
+# The DQ engine (python -m src.dqe.main, run from this folder by the portal) shares this Python.
+pandas~=3.1.1
+
+# MySQL / MariaDB sources.
+PyMySQL~=1.2.4
+
+# SQL Server sources (LIFT): pymssql by default; driver "jdbc" needs Java plus the two below.
+pymssql~=2.4.6
+JayDeBeApi~=1.2.3
+JPype1~=1.7.1

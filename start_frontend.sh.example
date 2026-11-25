@@ -1,0 +1,19 @@
+#!/bin/bash
+# Copy to start_frontend.sh next to the frontend/ folder and make it executable:
+#   cp start_frontend.sh.example start_frontend.sh && chmod +x start_frontend.sh
+# Settings (port, node, certificates) live in frontend/.env.server.
+set -euo pipefail
+
+cd "$(dirname "$(readlink -f "$0")")/frontend"
+
+if [ ! -f .env.server ]; then
+  echo "Missing frontend/.env.server. Copy frontend/.env.server.example and fill it in." >&2
+  exit 1
+fi
+
+if [ ! -f dist/index.html ]; then
+  npm install
+  npm run build
+fi
+
+exec scripts/frontend.sh start

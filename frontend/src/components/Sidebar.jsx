@@ -1,0 +1,697 @@
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useRBAC } from "../context/RBACContext";
+import { useAuth } from "../context/AuthContext";
+import { useAssistantSettings } from "../context/AssistantSettingsContext";
+import { useProfilePhoto } from "../hooks/useProfilePhoto";
+import { TOOL_CATALOG, dashboardRank } from "../config/tools";
+import { NARROW, useMediaQuery } from "../hooks/useMediaQuery";
+
+import logoutIcon from "/icons/JJ_Icon_Log_Out_RGB.svg";
+import chevronDown from "/icons/JJ_Icon_Chevron_Down.svg";
+import chevronLeft from "/icons/JJ_Icon_Chevron_Left.svg";
+import dashboardIcon from "/icons/JJ_Icon_Dashboard_RGB.svg";
+import dqIcon from "/icons/JJ_Icon_Analysis_RGB.svg";
+import searchIcon from "/icons/JJ_Icon_Search_RGB.svg";
+import aiIcon from "/icons/JJ_Icon_AI_RGB.svg";
+import userManagementIcon from "/icons/JJ_Icon_Gear_RGB.svg";
+import validationIcon from "/icons/JJ_Icon_Records_Information_RGB.svg";
+import auditIcon from "/icons/JJ_Icon_Stationery_RGB.svg";
+import commsIcon from "/icons/JJ_Icon_Communication_RGB.svg";
+import unstructuredIcon from "/icons/JJ_Icon_Data_Visualization.svg";
+import dataApiIcon from "/icons/JJ_Icon_Network_RGB.svg";
+import graDomainsIcon from "/icons/JJ_Icon_Presentation_RGB.svg";
+import dataStudioIcon from "/icons/JJ_Icon_Database_RGB.svg";
+import pipelineIcon from "/icons/JJ_Icon_Link_RGB.svg";
+import infoIcon from "/icons/JJ_Icon_Info_RGB.svg";
+import evidenceFlowIcon from "/icons/JJ_Icon_AI_RGB.svg";
+import logoFull from "/sh_logo.png";
+import logoMark from "/sh_logo_small_black.svg";
+import closeIcon from "/icons/JJ_Icon_Close.svg";
+import { saveReducedMotion, useReducedMotion } from '../utils/motion';
+import ShortcutsDialog from './ShortcutsDialog';
+import SignOutDialog from './SignOutDialog';
+
+const OPEN_W = 280;
+const SHUT_W = 76;
+const HIDE_DELAY = 180;
+const EDGE = 8;
+// Distance from the popout's top edge to the centre of its header row.
+const HEAD_CENTER = 25;
+
+// Each entry keeps its own permission; a group shows only if something in it does.
+// Order inside a group follows the dashboard (NEW first).
+const MENU_GROUPS = [
+  ["Workspace", [
+    { id: "dashboard",             label: "Dashboard",             icon: dashboardIcon,      path: "/dashboard", hint: "Your tools and recent activity in one place",             permission: "viewDashboard" },
+    { id: "dqe",                   label: "Data quality",          icon: dqIcon,             path: "/dqe", hint: "Quality checks and validation across your data",                   permission: "viewDQE" },
+    { id: "pipeline-studio",       label: "Pipeline Studio",       icon: pipelineIcon,       path: "/pipeline-studio", hint: "Open, extract and validate StreamSets pipelines",       permission: "runStreamsetsExtractor" },
+    { id: "ingestion-lab",  label: "Ingestion Lab",  icon: validationIcon,     path: "/ingestion-lab", hint: "Run ingestion steps and watch them live",  permission: "viewIngestionLab" },
+    { id: "fuzzy-match",           label: "Fuzzy match",           icon: searchIcon,         path: "/fuzzy-match", hint: "Search every Denodo view for a value",           permission: "viewFuzzyMatch" },
+    { id: "evidenceflow",          label: "EvidenceFlow",          icon: evidenceFlowIcon,   path: "/evidenceflow", hint: "Pull evidence from PBRER and DSUR PDFs",          permission: "viewEvidenceFlow" },
+  ]],
+  ["Explorers", [
+    { id: "unstructured-explorer", label: "Unstructured Explorer", icon: unstructuredIcon,   path: "/unstructured-explorer", hint: "Browse document sets with filters and charts", permission: "viewUnstructured" },
+    { id: "gra-data-domains",      label: "Structured Explorer",   icon: graDomainsIcon,     path: "/gra-data-domains", hint: "GRA data domains, sponsors and owners",      permission: "viewGraDataDomains" },
+    { id: "data-studio",           label: "Data Studio",           icon: dataStudioIcon,     path: "/data-studio", hint: "SQL, live tables, S3 and pipeline reports",           permission: "viewDataStudio" },
+    { id: "data-api",              label: "Data API Export",       icon: dataApiIcon,        path: "/data-api", hint: "Publish tables as read-only APIs",              permission: "manageDataAPIExports" },
+  ]],
+  ["Intelligence", [
+    { id: "rag",                   label: "RAGs",                  icon: aiIcon,             path: "/rag", hint: "AI answers from your document repositories",                   permission: "viewRAG" },
+    { id: "ai-assistant",          label: "AI assistant",          icon: aiIcon,             path: "/ai-assistant", hint: "Ask questions about your data",          permission: "viewAIChatbot" },
+  ]],
+  ["Admin", [
+    { id: "user-management",       label: "User Management",       icon: userManagementIcon, path: "/user-management", hint: "Roles, permissions and AD group access",       permission: "viewUserManagement" },
+    { id: "communication-center",  label: "Communication Center",  icon: commsIcon,          path: "/communication-center", hint: "Email updates and notices to portal users",  permission: "sendCommunications" },
+    { id: "audit",                 label: "Audit Log",             icon: auditIcon,          path: "/audit", hint: "Who's signed in, and every action on record",                 permission: "viewAudit" },
+  ]],
+];
+
+// Pinned under the tool groups for everyone, whatever their role.
+const ABOUT = { id: "about", label: "About us", icon: infoIcon, path: "/about", hint: "The team behind GRA SmartHub", subs: [] };
+
+const catalogFor = (path) => TOOL_CATALOG.find((t) => t.path === path);
+
+// A section is current when its path and every query param it names match the URL.
+const sectionMatches = (sectionPath, location) => {
+  const [p, q = ""] = sectionPath.split("?");
+  if (p !== location.pathname) return false;
+  const want = new URLSearchParams(q);
+  const have = new URLSearchParams(location.search);
+  for (const [k, v] of want) if (have.get(k) !== v) return false;
+  return [...want.keys()].length > 0;
+};
+
+const initialsOf = (name = "") => {
+  const clean = name.includes(",") ? name.split(",").reverse().join(" ") : name;
+  const parts = clean.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "U";
+};
+
+const isTyping = () => {
+  const el = document.activeElement;
+  return !!el && (/INPUT|TEXTAREA|SELECT/.test(el.tagName) || el.isContentEditable);
+};
+
+const clamp = (v, min, max) => Math.max(min, Math.min(v, max));
+
+const Icon = ({ src, className = "" }) => (
+  <span className={`sb-ic ${className}`} style={{ "--icon": `url("${src}")` }} aria-hidden="true" />
+);
+
+const Avatar = ({ photo, initials, live }) => (
+  <span className="sb-av">
+    {photo ? <img src={photo} alt="" /> : <span>{initials}</span>}
+    {live && <span className="sb-live" />}
+  </span>
+);
+
+const CSS = `
+.sb { --ease:cubic-bezier(.22,1,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  position:relative; flex-shrink:0; width:${SHUT_W}px; height:100%; z-index:30; transition:width .38s var(--ease);
+  font-family:'JohnsonText', Helvetica, Arial, sans-serif; color:#1f1b18; }
+.sb.open { width:${OPEN_W}px; }
+.sb *, .sb *::before, .sb *::after { box-sizing:border-box; }
+.sb a { text-decoration:none; }
+.sb a:focus-visible, .sb button:focus-visible { outline:2px solid #eb1700; outline-offset:2px; }
+
+.sb-ic { display:block; flex-shrink:0; background-color:currentColor;
+  -webkit-mask:var(--icon) center/contain no-repeat; mask:var(--icon) center/contain no-repeat; }
+
+.sb-panel { position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; background:#fdfcfb;
+  border-right:1px solid #d5cfc9; }
+
+.sb-brand { position:relative; z-index:1; display:flex; align-items:center; height:60px; flex-shrink:0; padding:0 16px 0 24px; background:#fdfcfb; /* left edge lines up with the menu below */
+  border-bottom:1px solid #efeae6; transition:box-shadow .2s; }
+/* the list slides under the logo and About us: a shadow shows only where something is hidden */
+.sb.sb-scrolled .sb-brand { box-shadow:0 8px 12px -10px rgba(40,20,10,.35); }
+.sb-brand img { display:block; user-select:none; }
+/* same image as the Unstructured Explorer header, a little larger */
+.sb-logo-full { width:124px; height:auto; }
+.sb-logo-mark { width:40px; height:40px; }
+
+.sb-nav { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:10px 13px 16px; overscroll-behavior:contain; }
+.sb-nav::-webkit-scrollbar { width:3px; }
+.sb-nav::-webkit-scrollbar-track { background:transparent; }
+.sb-nav::-webkit-scrollbar-thumb { background:#d5cfc9; border-radius:3px; }
+@supports not selector(::-webkit-scrollbar) { .sb-nav { scrollbar-width:thin; scrollbar-color:#d5cfc9 transparent; } }
+
+.sb-group { display:flex; flex-direction:column; gap:2px; }
+.sb-group + .sb-group { padding-top:14px; }
+.sb-gh { display:flex; align-items:center; height:26px; padding:0 12px; }
+.sb:not(.open) .sb-gh { justify-content:center; padding:0; }
+.sb-gh span { font-size:10.5px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:#8a827c; white-space:nowrap; }
+.sb-gh i { display:block; width:22px; height:1px; background:#e2dbd5; }
+
+.sb-link { position:relative; display:flex; align-items:center; gap:12px; height:40px; padding:0 12px; border-radius:12px;
+  font-size:14px; color:#4a433e; white-space:nowrap; transition:background-color .2s, color .2s, box-shadow .2s; }
+.sb:not(.open) .sb-link { justify-content:center; padding:0; }
+.sb-link > .sb-ic { width:18px; height:18px; color:#7a726c; }
+.sb-link:hover, .sb-link.flying { background:#f1ebe6; color:#1f1b18; box-shadow:inset 0 0 0 1px #e6dfd9, 0 4px 10px -6px rgba(40,20,10,.18); }
+.sb-link.on { background:#eb1700; color:#fff; font-weight:500; box-shadow:0 10px 22px -10px rgba(235,23,0,.6); }
+.sb-link.on:hover, .sb-link.on.flying { background:#d41500; color:#fff; box-shadow:0 12px 24px -10px rgba(235,23,0,.7); }
+.sb-link.on > .sb-ic { color:#fff; }
+.sb-lbl { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.sb-link > .sb-chev { width:10px; height:10px; margin-right:2px; transform:rotate(-90deg); }
+
+.sb-skel { display:flex; align-items:center; gap:12px; height:40px; padding:0 12px; }
+.sb:not(.open) .sb-skel { justify-content:center; padding:0; }
+.sb-skel i { display:block; border-radius:6px; background:#ece7e2; animation:sbBreath 1.4s ease-in-out infinite; }
+
+.sb-about { position:relative; z-index:1; padding:6px 13px; background:#fdfcfb; border-top:1px solid #efeae6; transition:box-shadow .2s; }
+.sb.sb-more .sb-about { box-shadow:0 -8px 12px -10px rgba(40,20,10,.35); }
+.sb-about .sb-link { height:34px; border-radius:10px; }
+.sb-about .sb-link.on { box-shadow:0 4px 10px -6px rgba(235,23,0,.55); }
+.sb-user { padding:12px 14px 14px; border-top:1px solid #efeae6; }
+.sb-ubtn { width:100%; display:flex; align-items:center; gap:10px; padding:6px; border-radius:14px; border:1px solid #ece7e2; background:#faf8f6;
+  cursor:pointer; text-align:left; font:inherit; color:inherit; overflow:hidden; transition:border-color .25s, background-color .2s; }
+.sb:not(.open) .sb-ubtn { justify-content:center; }
+.sb-ubtn:hover { background:#fff; }
+.sb-ubtn.on { border-color:rgba(235,23,0,.45); }
+.sb-av { position:relative; width:34px; height:34px; flex-shrink:0; border-radius:50%; padding:2px; background:#eb1700; }
+.sb-av > img, .sb-av > span:not(.sb-live) { display:flex; width:100%; height:100%; border-radius:50%; background:#fff; align-items:center; justify-content:center;
+  object-fit:cover; font-family:'JohnsonDisplay', sans-serif; font-weight:700; font-size:12px; color:#eb1700; }
+.sb-live { position:absolute; right:-1px; bottom:-1px; width:9px; height:9px; border-radius:50%; background:#16a34a; border:2px solid #fff; }
+.sb-uinfo { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; white-space:nowrap; }
+.sb-uinfo span { overflow:hidden; text-overflow:ellipsis; }
+.sb-uinfo span:first-child { font-size:13.5px; font-weight:500; }
+.sb-uinfo span:last-child { font-size:11.5px; color:#7a726c; }
+.sb-ubtn > .sb-chev { width:12px; height:12px; margin-right:6px; color:#7a726c; transition:transform .3s var(--ease); }
+.sb-ubtn.on > .sb-chev { transform:rotate(180deg); }
+
+.sb-menu { position:absolute; left:14px; bottom:72px; width:min(300px, calc(100vw - 28px)); z-index:20; overflow:hidden; background:#fff; border:1px solid #ebe5df; border-radius:16px;
+  box-shadow:0 28px 56px -20px rgba(40,20,10,.3); animation:sbUp .25s var(--ease) both; }
+.sb-menu-head { display:flex; flex-direction:column; gap:2px; padding:14px 16px; background:#faf8f6; border-bottom:1px solid #efeae6; }
+.sb-menu-head span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sb-menu-head .sb-menu-name { font-size:14px; font-weight:500; white-space:normal; overflow-wrap:anywhere; }
+.sb-menu-head em { align-self:flex-start; margin-top:6px; padding:2px 8px; border-radius:6px; background:#fde8e4; color:#c81400; font-style:normal; font-size:11px; }
+.sb-menu-lbl { margin:0; padding:12px 16px 2px; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#7a726c; }
+.sb-menu-head .sb-menu-mail { font-size:11.5px; color:#7a726c; }
+.sb-menu-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; }
+.sb-menu-links { margin-top:4px; padding:4px 0; border-top:1px solid #efeae6; }
+.sb-menu-links button { display:block; width:100%; padding:9px 16px; border:0; background:none; text-align:left; font:inherit; font-size:13.5px; color:#1f1b18; cursor:pointer; transition:background-color .2s; }
+.sb-menu-links button:hover, .sb-menu-links button:focus-visible { background:#f6f2ee; }
+.sb-menu-row div { display:flex; flex-direction:column; gap:2px; }
+.sb-menu-row div span:first-child { font-size:13.5px; }
+.sb-menu-row div span:last-child { font-size:12px; color:#7a726c; }
+.sb-switch { position:relative; width:44px; height:24px; padding:0; border:0; border-radius:12px; cursor:pointer; background:#d5cec8; transition:background-color .25s; }
+.sb-switch.on { background:#eb1700; }
+.sb-switch span { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .3s var(--spring); }
+.sb-switch.on span { transform:translateX(20px); }
+.sb-out { width:100%; display:flex; align-items:center; gap:10px; margin-top:8px; padding:13px 16px; border:0; border-top:1px solid #efeae6; background:#fff; cursor:pointer; text-align:left;
+  font:inherit; font-size:13.5px; color:#eb1700; transition:background-color .2s; }
+.sb-out:hover { background:#fdf2f0; }
+.sb-out .sb-ic { width:16px; height:16px; }
+
+.sb-toggle { position:absolute; top:58px; left:100%; z-index:6; width:26px; height:26px; margin-left:-13px; padding:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; background:#fff; border:1px solid #e6e0da;
+  box-shadow:0 6px 14px -6px rgba(40,20,10,.35); color:#eb1700; transition:border-color .2s; }
+.sb-toggle:hover { border-color:#eb1700; }
+.sb-toggle .sb-ic { width:12px; height:12px; transform:rotate(180deg); transition:transform .38s var(--ease); }
+.sb.open .sb-toggle .sb-ic { transform:none; }
+
+.sb-fly { position:absolute; top:0; left:100%; z-index:40; padding-left:10px; animation:sbPop .22s var(--ease) both; }
+.sb-fly-card { position:relative; width:max-content; max-width:250px; padding:6px; background:rgba(31,27,24,.74); border:1px solid rgba(255,255,255,.08); border-radius:14px;
+  -webkit-backdrop-filter:blur(18px) saturate(1.5); backdrop-filter:blur(18px) saturate(1.5);
+  box-shadow:0 22px 44px -16px rgba(20,10,5,.55); }
+.sb-fly-card.has-subs { min-width:200px; }
+/* the description is a second, smaller tooltip beside the card; it shows
+   only while the pointer rests on the page name (or it has keyboard focus);
+   moving to a sub-page or away hides it.
+   It sits outside the card so its own blur isn't cut off by the card's. */
+.sb-fly-hint { position:absolute; left:calc(100% + 8px); top:6px; width:max-content; max-width:240px; margin:0; padding:7px 10px;
+  border-radius:10px; background:rgba(31,27,24,.74); border:1px solid rgba(255,255,255,.08);
+  -webkit-backdrop-filter:blur(18px) saturate(1.5); backdrop-filter:blur(18px) saturate(1.5); box-shadow:0 14px 30px -14px rgba(20,10,5,.5);
+  font-size:12px; line-height:1.4; color:#e6ded7; white-space:normal; text-wrap:pretty; pointer-events:none;
+  opacity:0; visibility:hidden; translate:-4px 0; transition:opacity .18s, translate .18s var(--ease), visibility 0s linear .18s; }
+.sb-fly-card:has(.sb-fly-head:hover) ~ .sb-fly-hint, .sb-fly-card:has(.sb-fly-head:focus-visible) ~ .sb-fly-hint { opacity:1; visibility:visible; translate:0 0; transition-delay:.35s; }
+.sb-fly-arrow { position:absolute; left:-6px; top:var(--arrow, 20px); width:10px; height:10px; background:rgba(31,27,24,.74);
+  border-left:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08); clip-path:polygon(0 0, 0 100%, 100% 100%); transform:rotate(45deg); }
+.sb-fly-head, .sb-fly-sub { position:relative; display:flex; align-items:center; border-radius:9px; white-space:nowrap;
+  transition:background-color .18s, box-shadow .18s, color .18s, translate .2s var(--ease); }
+.sb-fly-head { gap:8px; height:36px; padding:0 10px; font-size:13.5px; font-weight:500; color:#fff; }
+.sb-fly-sub { gap:10px; height:32px; padding:0 10px; font-size:13px; color:#c9c0b8; transform-origin:left center; animation:sbOut .45s var(--spring) both; }
+.sb-fly-head:hover, .sb-fly-sub:hover, .sb-fly-head:focus-visible, .sb-fly-sub:focus-visible {
+  background:rgba(255,255,255,.13); color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); outline:none; }
+.sb-fly-sub:hover, .sb-fly-sub:focus-visible { translate:3px 0; }
+.sb-fly-sub.on { color:#fff; font-weight:500; }
+.sb-fly-sub i { display:block; flex-shrink:0; width:6px; height:6px; border-radius:50%; }
+.sb-fly-sub.on i { background:#eb1700; }
+.sb-fly-hr { height:1px; margin:4px 6px; background:rgba(255,255,255,.1); }
+
+.sb-scrim { display:none; }
+
+/* Phones and tablets: an off-canvas drawer with full labels, opened from the top bar. */
+.sb.mobile { position:fixed; top:0; bottom:0; left:0; width:min(${OPEN_W}px, 86vw); height:100dvh; z-index:60;
+  transform:translateX(-100%); transition:transform .32s var(--ease), visibility 0s linear .32s; visibility:hidden; }
+.sb.mobile.drawer { transform:none; visibility:visible; transition:transform .32s var(--ease); }
+.sb.mobile .sb-panel { box-shadow:24px 0 48px -16px rgba(40,20,10,.35); }
+.sb.mobile .sb-link { height:44px; }
+.sb.mobile .sb-about .sb-link { height:40px; }
+/* No popouts in the drawer, so no chevron promising one. */
+.sb.mobile .sb-link > .sb-chev { display:none; }
+.sb-scrim.on { display:block; position:fixed; inset:0; z-index:55; background:rgba(31,27,24,.42); animation:sbFade .2s ease both; }
+.sb-close { margin-left:auto; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:0; border-radius:10px;
+  background:transparent; color:#4a433e; cursor:pointer; }
+.sb-close:hover { background:#f1ebe6; }
+.sb-close .sb-ic { width:14px; height:14px; }
+
+@keyframes sbFade { from { opacity:0; } to { opacity:1; } }
+@keyframes sbPop { from { opacity:0; transform:translateX(-6px) scale(.98); } to { opacity:1; transform:none; } }
+@keyframes sbUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+@keyframes sbOut { 0% { opacity:0; transform:translateX(-18px) scale(.7); } 60% { opacity:1; transform:translateX(3px) scale(1.04); } 100% { opacity:1; transform:none; } }
+@keyframes sbBreath { 50% { opacity:.45; } }
+
+html.reduce-motion .sb, html.reduce-motion .sb *, html.reduce-motion .sb *::before, html.reduce-motion .sb *::after { animation-duration:.01ms !important; animation-delay:0ms !important; transition-duration:.01ms !important; }
+`;
+
+// `expanded` is optional: the dashboard passes it (its header owns the toggle);
+// every other page lets the sidebar keep its own state.
+// On narrow screens the sidebar is a drawer: `drawerOpen` shows it and
+// `onDrawerClose` is called for the scrim, Escape, the close button and navigation.
+const Sidebar = ({ showUserMenu = false, showLogo = true, expanded, drawerOpen = false, onDrawerClose }) => {
+  const mobile = useMediaQuery(NARROW);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { hasPermission, loading: rbacLoading, roleDefinition } = useRBAC();
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const { logout, user } = useAuth();
+  const { enabled: assistantEnabled, setEnabled: setAssistantEnabled } = useAssistantSettings();
+  const { profilePhoto } = useProfilePhoto(user, logout);
+  const canUseAssistant = hasPermission("viewAssistantAvatar");
+
+  const currentPath = location.pathname.split("/")[1] || "dashboard";
+  const controlled = expanded !== undefined;
+  const [ownOpen, setOwnOpen] = useState(currentPath === "dashboard");
+  const open = mobile || (controlled ? expanded : ownOpen);
+
+  const [userOpen, setUserOpen] = useState(false);
+  const [fly, setFly] = useState(null);
+
+  const asideRef = useRef(null);
+  const navRef = useRef(null);
+  const userRef = useRef(null);
+  const menuRef = useRef(null);
+  const flyRef = useRef(null);
+  const hideTimer = useRef(0);
+
+  const cancelHide = useCallback(() => clearTimeout(hideTimer.current), []);
+  const closeFly = useCallback(() => { clearTimeout(hideTimer.current); setFly(null); }, []);
+  const scheduleHide = useCallback(() => {
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => setFly(null), HIDE_DELAY);
+  }, []);
+
+  useEffect(() => () => clearTimeout(hideTimer.current), []);
+
+  // Keep the current page's item in sight. On a short window the list
+  // scrolls, and items low in it (Audit Log) sat below the fold with
+  // nothing showing which page you're on. Scrolls the list only, never the page.
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const link = nav?.querySelector(".sb-link.on");
+    if (!link) return;
+    const top = link.offsetTop - nav.offsetTop;
+    const pad = 16;
+    if (top < nav.scrollTop + pad) nav.scrollTop = Math.max(0, top - pad);
+    else if (top + link.offsetHeight > nav.scrollTop + nav.clientHeight - pad)
+      nav.scrollTop = top + link.offsetHeight - nav.clientHeight + pad;
+  }, [currentPath, rbacLoading, open]);
+
+  // Expanded on the dashboard, collapsed elsewhere; reset on every route change.
+  useEffect(() => {
+    setOwnOpen(currentPath === "dashboard");
+    closeFly();
+  }, [currentPath, closeFly]);
+
+  useEffect(() => {
+    closeFly();
+    if (!open) setUserOpen(false);
+  }, [open, closeFly]);
+
+  const toggle = useCallback(() => setOwnOpen((o) => !o), []);
+
+  // Mark which ends of the list have tools hidden under them (drives the shadows)
+  const markEdges = useCallback(() => {
+    const nav = navRef.current;
+    const aside = asideRef.current;
+    if (!nav || !aside) return;
+    aside.classList.toggle("sb-scrolled", nav.scrollTop > 1);
+    aside.classList.toggle("sb-more", nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
+  }, []);
+
+  useLayoutEffect(() => {
+    markEdges();
+    const nav = navRef.current;
+    if (!nav) return undefined;
+    const ro = new ResizeObserver(markEdges);
+    ro.observe(nav);
+    return () => ro.disconnect();
+  }, [markEdges, open, rbacLoading]);
+
+  // [ toggles, Escape dismisses.
+  useEffect(() => {
+    const onKey = (e) => {
+      // Esc inside a dialog (sign-out, shortcuts) closes only that dialog
+      if (e.target.closest?.("dialog")) return;
+      if (e.key === "Escape") {
+        closeFly();
+        setUserOpen(false);
+        if (mobile) onDrawerClose?.();
+        return;
+      }
+      if (e.ctrlKey || e.metaKey) return;
+      if (e.key === "[" && !e.altKey && !controlled && !mobile && !isTyping()) {
+        toggle();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [controlled, toggle, closeFly, mobile, onDrawerClose]);
+
+  // A hidden drawer must not keep focus or popouts.
+  useEffect(() => {
+    if (!mobile || drawerOpen) return;
+    closeFly();
+    setUserOpen(false);
+    if (asideRef.current?.contains(document.activeElement)) document.activeElement.blur();
+  }, [mobile, drawerOpen, closeFly]);
+
+  useEffect(() => {
+    if (!userOpen) return undefined;
+    const onDown = (e) => {
+      if (e.target.closest?.("dialog")) return; // the sign-out question keeps the menu behind it
+      if (!userRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setUserOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [userOpen]);
+
+  const allowed = useMemo(() => {
+    if (rbacLoading) return [];
+    return MENU_GROUPS
+      .map(([title, items]) => [title, items
+        .filter((item) => hasPermission(item.permission))
+        .sort((a, b) => dashboardRank(a.path) - dashboardRank(b.path))
+        .map((item) => {
+          const cat = catalogFor(item.path);
+          const subs = (cat?.sections || []).filter((s) => !s.permission || hasPermission(s.permission));
+          return { ...item, subs };
+        })])
+      .filter(([, items]) => items.length > 0);
+  }, [rbacLoading, hasPermission]);
+
+  const groups = allowed;
+  const flat = useMemo(() => groups.flatMap(([, items]) => items), [groups]);
+  const flyItem = fly ? (fly.id === ABOUT.id ? ABOUT : flat.find((i) => i.id === fly.id)) : undefined;
+
+  // Keep the popout inside the visible part of the sidebar, arrow on the hovered row.
+  useLayoutEffect(() => {
+    const el = flyRef.current;
+    const aside = asideRef.current;
+    if (!fly || !flyItem || !el || !aside) return;
+    const a = aside.getBoundingClientRect();
+    const limit = Math.min(a.height, window.innerHeight - a.top);
+    const h = el.offsetHeight;
+    const top = clamp(fly.center - HEAD_CENTER, EDGE, Math.max(EDGE, limit - h - EDGE));
+    el.style.top = `${top}px`;
+    el.style.setProperty("--arrow", `${clamp(fly.center - top - 5, 12, h - 22)}px`);
+  }, [fly, flyItem]);
+
+  const go = (path) => {
+    closeFly();
+    if (mobile) onDrawerClose?.();
+    navigate(path);
+  };
+
+  const onLinkClick = (e, path) => {
+    if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    go(path);
+  };
+
+  // Collapsed: every row gets a popout. Expanded: only rows with sub pages do.
+  const showFly = (target, item) => {
+    cancelHide();
+    // No room beside a drawer; its sub pages are reached from the tool itself.
+    if (mobile) return;
+    if (open && item.subs.length === 0) { setFly(null); return; }
+    const a = asideRef.current.getBoundingClientRect();
+    const r = target.getBoundingClientRect();
+    const center = r.top - a.top + r.height / 2;
+    setFly((f) => (f && f.id === item.id && f.center === center ? f : { id: item.id, center }));
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout failed:", error);
+      window.location.replace("/logout");
+    }
+  };
+
+  const name = (user?.name || user?.username || "User").replace(/\s*\[.*?\]\s*/g, "").trim();
+  const email = user?.email || user?.username || "";
+  const initials = initialsOf(name);
+
+  const cls = `sb${open ? " open" : ""}${mobile ? " mobile" : ""}${mobile && drawerOpen ? " drawer" : ""}`;
+
+  return (
+    <>
+    <style>{CSS}</style>
+    {mobile && <div className={`sb-scrim${drawerOpen ? " on" : ""}`} onClick={onDrawerClose} aria-hidden="true" />}
+    <aside
+      ref={asideRef}
+      id="main-navigation"
+      className={cls}
+      aria-label="Main navigation"
+      aria-hidden={mobile && !drawerOpen ? true : undefined}
+      inert={mobile && !drawerOpen ? true : undefined}
+    >
+      <div className="sb-panel">
+        {(showLogo || mobile) && (
+          <div className="sb-brand">
+            {open
+              ? <img src={logoFull} alt="GRA SmartHub" className="sb-logo-full" draggable={false} />
+              : <img src={logoMark} alt="GRA SmartHub" className="sb-logo-mark" draggable={false} />}
+            {mobile && (
+              <button type="button" className="sb-close" onClick={onDrawerClose} aria-label="Close menu">
+                <Icon src={closeIcon} />
+              </button>
+            )}
+          </div>
+        )}
+
+        <nav className="sb-nav" ref={navRef} onScroll={() => { if (fly) closeFly(); markEdges(); }}>
+          {rbacLoading && (
+            <div className="sb-group" aria-hidden="true">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="sb-skel">
+                  <i style={{ width: 18, height: 18 }} />
+                  {open && <i style={{ flex: 1, height: 12 }} />}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {groups.map(([title, items]) => (
+            <div key={title} className="sb-group" role="group" aria-label={title}>
+              <div className="sb-gh">{open ? <span>{title}</span> : <i aria-hidden="true" />}</div>
+              {items.map((item) => {
+                // audit-edit(-force) belongs to Audit Log, data-api-view to Data API
+                const on = currentPath === item.id || currentPath.startsWith(`${item.id}-`);
+                const flying = fly?.id === item.id;
+                const hasSubs = item.subs.length > 0;
+                return (
+                  <a
+                    key={item.id}
+                    href={item.path}
+                    className={`sb-link${on ? " on" : ""}${flying ? " flying" : ""}`}
+                    aria-current={on ? "page" : undefined}
+                    aria-label={open ? undefined : item.label}
+                    aria-haspopup={hasSubs && !mobile ? "true" : undefined}
+                    aria-expanded={hasSubs && !mobile ? flying : undefined}
+                    onClick={(e) => onLinkClick(e, item.path)}
+                    onMouseEnter={(e) => showFly(e.currentTarget, item)}
+                    onMouseLeave={scheduleHide}
+                    onFocus={(e) => showFly(e.currentTarget, item)}
+                    onBlur={scheduleHide}
+                  >
+                    <Icon src={item.icon} />
+                    {open && (
+                      <>
+                        <span className="sb-lbl">{item.label}</span>
+                        {hasSubs && <Icon src={chevronDown} className="sb-chev" />}
+                      </>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+          ))}
+
+        </nav>
+
+        <div className="sb-about">
+          <a
+            href={ABOUT.path}
+            className={`sb-link${currentPath === ABOUT.id ? " on" : ""}${fly?.id === ABOUT.id ? " flying" : ""}`}
+            aria-current={currentPath === ABOUT.id ? "page" : undefined}
+            aria-label={open ? undefined : ABOUT.label}
+            onClick={(e) => onLinkClick(e, ABOUT.path)}
+            onMouseEnter={(e) => showFly(e.currentTarget, ABOUT)}
+            onMouseLeave={scheduleHide}
+            onFocus={(e) => showFly(e.currentTarget, ABOUT)}
+            onBlur={scheduleHide}
+          >
+            <Icon src={ABOUT.icon} />
+            {open && <span className="sb-lbl">{ABOUT.label}</span>}
+          </a>
+        </div>
+
+        {(showUserMenu || mobile) && (
+          <div className="sb-user" ref={userRef}>
+            <button
+              type="button"
+              className={`sb-ubtn${userOpen ? " on" : ""}`}
+              onClick={() => { closeFly(); setUserOpen((o) => !o); }}
+              aria-haspopup="menu"
+              aria-expanded={userOpen}
+              aria-label={open ? undefined : name}
+            >
+              <Avatar photo={profilePhoto} initials={initials} live />
+              {open && (
+                <>
+                  <span className="sb-uinfo">
+                    <span>{name}</span>
+                    <span>{email}</span>
+                  </span>
+                  <Icon src={chevronDown} className="sb-chev" />
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!controlled && !mobile && (
+        <button
+          type="button"
+          className="sb-toggle"
+          onClick={toggle}
+          title="Toggle sidebar  ["
+          aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+          aria-expanded={open}
+        >
+          <Icon src={chevronLeft} />
+        </button>
+      )}
+
+      {(showUserMenu || mobile) && userOpen && (
+        <div className="sb-menu" role="menu" ref={menuRef}>
+          <div className="sb-menu-head">
+            <span className="sb-menu-name">{name}</span>
+            <span className="sb-menu-mail" title={email}>{email}</span>
+            {roleDefinition?.name && <em>{roleDefinition.name}</em>}
+          </div>
+          <p className="sb-menu-lbl">Preferences</p>
+          {canUseAssistant && (
+            <div className="sb-menu-row">
+              <div>
+                <span>SmartHub Assistant</span>
+                <span>Floating helper on every page</span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={assistantEnabled}
+                aria-label="SmartHub Assistant"
+                className={`sb-switch${assistantEnabled ? " on" : ""}`}
+                onClick={() => setAssistantEnabled(!assistantEnabled)}
+              >
+                <span />
+              </button>
+            </div>
+          )}
+          <div className="sb-menu-row">
+            <div>
+              <span>Reduce motion</span>
+              <span>Calmer pages, fewer animations</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={reduceMotion}
+              aria-label="Reduce motion"
+              className={`sb-switch${reduceMotion ? " on" : ""}`}
+              onClick={() => saveReducedMotion(!reduceMotion)}
+            >
+              <span />
+            </button>
+          </div>
+          <div className="sb-menu-links">
+            <button type="button" role="menuitem" onClick={() => { setUserOpen(false); setShortcutsOpen(true); }}>Keyboard shortcuts</button>
+            {hasPermission("sendCommunications") && (
+              <button type="button" role="menuitem" onClick={() => { setUserOpen(false); navigate("/communication-center?tab=whats-new"); }}>What&apos;s new</button>
+            )}
+          </div>
+          <button type="button" role="menuitem" className="sb-out" onClick={() => setSignOutOpen(true)}>
+            <Icon src={logoutIcon} />
+            Sign out
+          </button>
+        </div>
+      )}
+
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <SignOutDialog open={signOutOpen} onClose={() => setSignOutOpen(false)} onConfirm={handleLogout} />
+
+      {flyItem && (
+        <div
+          ref={flyRef}
+          className="sb-fly"
+          role="group"
+          aria-label={flyItem.label}
+          onMouseEnter={cancelHide}
+          onMouseLeave={scheduleHide}
+          onFocus={cancelHide}
+          onBlur={scheduleHide}
+        >
+          <div className={`sb-fly-card${flyItem.subs.length ? " has-subs" : ""}`}>
+            <span className="sb-fly-arrow" aria-hidden="true" />
+            <a href={flyItem.path} className="sb-fly-head" onClick={(e) => onLinkClick(e, flyItem.path)}>
+              {flyItem.label}
+            </a>
+            {flyItem.subs.length > 0 && (
+              <>
+                <div className="sb-fly-hr" aria-hidden="true" />
+                {flyItem.subs.map((s, i) => {
+                  const on = sectionMatches(s.path, location);
+                  return (
+                    <a
+                      key={s.path}
+                      href={s.path}
+                      className={`sb-fly-sub${on ? " on" : ""}`}
+                      aria-current={on ? "page" : undefined}
+                      style={{ animationDelay: `${40 + i * 55}ms` }}
+                      onClick={(e) => onLinkClick(e, s.path)}
+                    >
+                      <i aria-hidden="true" />
+                      {s.label}
+                    </a>
+                  );
+                })}
+              </>
+            )}
+          </div>
+          {flyItem.hint && <p className="sb-fly-hint" role="tooltip">{flyItem.hint}</p>}
+        </div>
+      )}
+    </aside>
+    </>
+  );
+};
+
+export default Sidebar;
