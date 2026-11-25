@@ -119,31 +119,33 @@ const relative = (d) => {
 // Every image in the value, in document order, with what its record says about it.
 const collectMedia = (root) => {
   const out = [];
-  const walk = (v, path, parent) => {
+  // label: the record headings on the way down, as the cards show them ("Page 2 · Image 1").
+  const walk = (v, path, parent, label) => {
     if (out.length >= MEDIA_MAX) return;
     if (typeof v === 'string') {
       const img = imageOf(v);
       if (img) {
         const meta = parent && !Array.isArray(parent) ? parent : {};
-        out.push({ id: pathId(path), path, ...img, bytes: num(meta.bytes) ?? num(meta.size) ?? img.bytes, width: num(meta.width), height: num(meta.height), name: meta.name || meta.filename || meta.file_name || null });
+        out.push({
+          id: pathId(path), path, ...img, label: label.join(' · ') || humanize(path[path.length - 1] ?? 'Image'),
+          bytes: num(meta.bytes) ?? num(meta.size) ?? img.bytes, width: num(meta.width), height: num(meta.height),
+          name: meta.name || meta.filename || meta.file_name || null,
+        });
       }
       return;
     }
     if (v && typeof v === 'object') {
-      if (Array.isArray(v)) v.forEach((c, i) => walk(c, [...path, i], v));
-      else for (const [k, c] of Object.entries(v)) walk(c, [...path, k], v);
+      if (Array.isArray(v)) {
+        const key = path[path.length - 1];
+        v.forEach((c, i) => walk(c, [...path, i], v, [...label, c && typeof c === 'object' && !Array.isArray(c) ? headingOf(c, key, i) : `${singular(key ?? 'item')} ${i + 1}`]));
+      } else for (const [k, c] of Object.entries(v)) walk(c, [...path, k], v, label);
     }
   };
-  walk(root, [], null);
+  walk(root, [], null, []);
   return out;
 };
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const pathId = (path) => path.map(p => String(p).replace(/~/g, '~0').replace(/\//g, '~1')).join('/');
-// "Page 3 · Image 1": just the numbered steps, or the last name if there are none.
-const shortLabel = (path) => {
-  const steps = path.map((p, i) => (typeof p === 'number' ? `${singular(path[i - 1] ?? 'item')} ${p + 1}` : null)).filter(Boolean);
-  return steps.length ? steps.join(' · ') : humanize(path[path.length - 1] ?? 'Image');
-};
 const pathLabel = (path) => path.map((p, i) => (typeof p === 'number' ? `${singular(path[i - 1] ?? 'item')} ${p + 1}` : humanize(p))).join(' › ') || 'Value';
 
 const downloadData = (src, name) => {
@@ -242,7 +244,7 @@ function Figure({ img, id, caption, onOpen }) {
       <button
         type="button"
         onClick={() => !failed && onOpen(id)}
-        className="vv-checker relative block w-full rounded-[10px] border border-[#e8e6e3] overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] cursor-zoom-in"
+        className="relative flex w-full items-center justify-center p-3 sm:p-4 rounded-[10px] border border-[#e8e6e3] bg-[#f4f2f0] overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] cursor-zoom-in"
         aria-label={`Open ${name} full size`}
       >
         {failed ? (
@@ -255,7 +257,7 @@ function Figure({ img, id, caption, onOpen }) {
             decoding="async"
             onLoad={e => setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
             onError={() => setFailed(true)}
-            className="block mx-auto max-h-[420px] max-w-full object-contain"
+            className="vv-checker vv-paper block max-h-[440px] max-w-full rounded-[3px]"
           />
         )}
         {!failed && (
@@ -527,6 +529,39 @@ const statsOf = (root, media) => {
   return chips;
 };
 
+// A gallery tile shaped like its image: a document page stands tall, a chart
+// lies wide, each on a neutral mat with its label underneath (not on top).
+const THUMB_H = 150;
+function Thumb({ m, onOpen }) {
+  const [dims, setDims] = useState(m.width && m.height ? { w: m.width, h: m.height } : null);
+  const ratio = dims ? dims.w / dims.h : 0.8;
+  const width = Math.round(Math.min(260, Math.max(112, THUMB_H * ratio)));
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(m.id)}
+      title={`${m.label} · ${formatBytes(m.bytes)}`}
+      style={{ width: width + 12 }}
+      className="group/th flex-shrink-0 snap-start p-1.5 rounded-[11px] border border-[#e8e6e3] bg-white text-left transition-colors hover:border-[#cfc8c1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)]"
+    >
+      <span className="flex items-center justify-center rounded-[7px] bg-[#f4f2f0] overflow-hidden" style={{ height: THUMB_H }}>
+        <img
+          src={m.src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onLoad={e => { if (!dims) setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); }}
+          className="vv-checker vv-paper block max-w-[calc(100%-12px)] max-h-[calc(100%-12px)] rounded-[2px] transition-transform duration-200 group-hover/th:scale-[1.03]"
+        />
+      </span>
+      <span className="block mt-1.5 px-0.5 truncate text-[11.5px] font-medium text-[#4a423e]">{m.label}</span>
+      <span className="block px-0.5 truncate text-[10.5px] text-[#8a7f78] tabular-nums" title={formatBytes(m.bytes)}>
+        {dims ? `${dims.w} × ${dims.h}` : formatBytes(m.bytes)}
+      </span>
+    </button>
+  );
+}
+
 function Gallery({ media, onOpen }) {
   const [shown, setShown] = useState(24);
   return (
@@ -537,20 +572,9 @@ function Gallery({ media, onOpen }) {
         <span className="text-[11.5px] text-[#8a7f78]">{fmtN(media.length)}</span>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1 snap-x">
-        {media.slice(0, shown).map(m => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => onOpen(m.id)}
-            title={pathLabel(m.path)}
-            className="vv-checker group/th relative flex-shrink-0 snap-start w-[112px] h-[84px] rounded-[9px] border border-[#e8e6e3] overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)]"
-          >
-            <img src={m.src} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain transition-transform duration-200 group-hover/th:scale-[1.04]" />
-            <span className="absolute left-1 bottom-1 px-1.5 rounded bg-[#312c2a]/75 text-[10px] text-white tabular-nums">{shortLabel(m.path.slice(0, -1))}</span>
-          </button>
-        ))}
+        {media.slice(0, shown).map(m => <Thumb key={m.id} m={m} onOpen={onOpen} />)}
         {media.length > shown && (
-          <button type="button" onClick={() => setShown(s => s + 24)} className="flex-shrink-0 w-[112px] h-[84px] rounded-[9px] border border-dashed border-[#d5cfc9] text-[12px] font-medium text-[var(--sig-ink)] hover:bg-[#faf9f8]">
+          <button type="button" onClick={() => setShown(s => s + 24)} className="flex-shrink-0 w-[120px] h-[204px] rounded-[10px] border border-dashed border-[#d5cfc9] text-[12px] font-medium text-[var(--sig-ink)] hover:bg-[#faf9f8]">
             +{fmtN(media.length - shown)} more
           </button>
         )}
@@ -653,7 +677,7 @@ function Lightbox({ items, index, onIndex, onClose }) {
     <div role="dialog" aria-modal="true" aria-label="Image" className="vv-in fixed inset-0 z-[95] flex flex-col bg-[#0f0d0c]/[.96] text-white" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="flex items-center gap-3 px-4 sm:px-6 h-[56px] flex-shrink-0">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">{shortLabel(item.path.slice(0, -1))}<span className="ml-2 font-normal text-white/50">{pathLabel(item.path)}</span></div>
+          <div className="truncate text-[13px] font-medium">{item.label}<span className="ml-2 font-normal text-white/50">{pathLabel(item.path)}</span></div>
           <div className="text-[11.5px] text-white/60 tabular-nums">
             {[item.mime.replace('image/', '').toUpperCase(), item.width && item.height ? `${fmtN(item.width)} × ${fmtN(item.height)}` : null, formatBytes(item.bytes)].filter(Boolean).join(' · ')}
             {items.length > 1 && <span className="ml-2">{index + 1} / {items.length}</span>}
@@ -690,6 +714,7 @@ function Lightbox({ items, index, onIndex, onClose }) {
 const PREVIEW_CSS = `
 .vv-card { background: #fff; border: 1px solid #e8e6e3; border-radius: 14px; box-shadow: 0 1px 2px rgba(49,44,42,.04); }
 .vv-cv { content-visibility: auto; contain-intrinsic-size: auto 240px; }
+.vv-paper { box-shadow: 0 1px 2px rgba(49,44,42,.10), 0 0 0 1px rgba(49,44,42,.06); }
 .vv-checker { background-color: #fff; background-image: linear-gradient(45deg,#f1efed 25%,transparent 25%),linear-gradient(-45deg,#f1efed 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f1efed 75%),linear-gradient(-45deg,transparent 75%,#f1efed 75%); background-size: 16px 16px; background-position: 0 0,0 8px,8px -8px,-8px 0; }
 .vv-fade { -webkit-mask-image: linear-gradient(180deg,#000 70%,transparent); mask-image: linear-gradient(180deg,#000 70%,transparent); }
 .vv-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 8px; border: 1px solid #e0dbd6; background: #fff; font-size: 12px; font-weight: 500; color: #312c2a; transition: background-color .15s, border-color .15s; }
