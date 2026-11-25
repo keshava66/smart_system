@@ -24,7 +24,7 @@ sys.path.insert(0, str(BACKEND))
 # The reviewed version of every file this change touched. A mismatch means the
 # copy here is older (or newer) than the one that was tested.
 EXPECTED = {
-    "Readme.md": "88b6347c5a9b3e084200c4b53274bef9d86b41a33e1c98d7c4a25f1dc949dce6",
+    "Readme.md": "193be949c55594f5f1911cf665ab381e3efa49eed454f57c5bcf847bfede1a3f",
     "backend/.env.example": "fcc77d10d043097a892377cfd466e05506521401506c6646816e843d9e32db5c",
     "backend/app.py": "34f75ae7cbb90adc60a3731726d88e29f8d9b0ccbc064f9355649cf8c1859cda",
     "backend/assistant/knowledge/portal_overview.md": "57003e943beb4a6a3764f983da6419a8d31eafbbade8d14a4f0ae15e3bf554dd",
@@ -83,14 +83,15 @@ EXPECTED = {
     "frontend/src/pages/dataStudio/sf_pg/paneLib.js": "466939ab17e92c378fce8f64a5d55b76399cbfc3d4a66a70a3281fe728b8918c",
     "frontend/src/pages/dataStudio/sf_pg/paneUi.jsx": "716d31cb1262c96e51b46cf2f2797918be32cb8ed16b1611ee02f32754cd4f90",
     "frontend/src/pages/dataStudio/sf_pg/sf_pg_pane.jsx": "01f7ee6d00d62e1aa8ff39017c89a2aadcab165552b20ad36554f1946d49efa6",
-    "frontend/src/pages/dataStudio/sf_pg/valueViewer.jsx": "d0830e907fcd8b7406a93ffc8b7f9d4361d008166a7e7fb57936675c3c6dcb80",
+    "frontend/src/pages/dataStudio/sf_pg/valuePreview.jsx": "3608d1ee3355019a5b8ccff671dd6bbdc12b25e510c4ed2d50054145409eb79f",
+    "frontend/src/pages/dataStudio/sf_pg/valueViewer.jsx": "0e72118b93a268384497b5547e971bb78a337723d431056e1c1055fe8275b9d1",
     "frontend/src/pages/dataStudio/shared/studioHelpers.jsx": "6c0bbefcc87e1c872343b57122ad7ab57997dbc16e946c75437d0ec3cea29362",
     "frontend/src/pages/userManagement/access.js": "7c6f16204a8fb58d9a6af582e4656ffe9f7827abd4e4e0f97b2b16d558c0f363",
     "frontend/tests/bdc.test.jsx": "78ecdf7e8560fbfec50962b8baddaf66ba7d867cdaca235476caf4f8e5c987ec",
     "frontend/tests/dqe.test.jsx": "455ac719038fa7b7bc625898f50d8069a6e7da5f562a4bfb84cbe232b31f6ee9",
     "frontend/tests/studioExplorer.test.jsx": "0270586122d784c48bcb14741af77d200258fe0a880107dbc5c18dca2d0b4066",
     "frontend/tests/studioTips.test.jsx": "87b7200017b75a6e468bf435d09bbdc6f799dfe54223f7c8a2433715800f432f",
-    "frontend/tests/studioValueViewer.test.jsx": "6f9e26b51cdaa7d32c4ab1a95de2d7ded2870da23101114fd8fb850787e7c88f",
+    "frontend/tests/studioValueViewer.test.jsx": "d6c2851fee5b93bad454a64beb2f36dc29ca43c6d30e94da2037e89913d88559",
 }
 
 TABLES = [

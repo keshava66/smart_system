@@ -1,17 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlignLeft, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ChevronUp, Copy, Download, Link2,
-  ListTree, Maximize2, Search, TriangleAlert, WrapText, X,
+  Braces, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ChevronUp, Code2, Copy, Download, FileText, Link2,
+  ListTree, Maximize2, ScanEye, Search, TriangleAlert, WrapText, X,
 } from 'lucide-react';
+import { Preview } from './valuePreview';
 import { cellText } from '../shared/studioHelpers';
-import { Button, IconButton, Modal, Spinner, ViewTab } from './paneUi';
+import { Button, IconButton, Modal, Spinner } from './paneUi';
 import { fmtN, isBig, plural, useEngine } from './paneLib';
 
-// One cell, opened from the results grid: JSON as a tree you can fold and
-// search, anything else as text with line numbers. Big cells the grid only
-// has the start of load in full on open (up to AUTO_LOAD_BYTES).
+// One cell, opened from the results grid, three ways:
+//   Preview  the value read like a document (valuePreview.jsx): images drawn,
+//            links, dates and sizes read as such, records as cards and tables
+//   Tree     the JSON to fold and search
+//   Raw      the text itself, with line numbers
+// Big cells the grid only has the start of load in full on open (up to
+// AUTO_LOAD_BYTES). The last view picked is remembered.
 
 const AUTO_LOAD_BYTES = 1024 * 1024;
+const VIEW_KEY = 'dataStudio.cellView';
+const VIEWS = [
+  { id: 'preview', label: 'Preview', icon: ScanEye },
+  { id: 'tree', label: 'Tree', icon: ListTree },
+  { id: 'text', label: 'Raw', icon: Code2 },
+];
+const readView = () => { try { return window.localStorage.getItem(VIEW_KEY) || 'preview'; } catch { return 'preview'; } };
 const PARSE_MAX_CHARS = 5_000_000;     // past this JSON is shown as text only
 const TREE_MAX_NODES = 300_000;        // past this the tree would be too slow to fold
 const CHILDREN_PAGE = 200;             // children shown per object / array, more on request
@@ -218,7 +230,10 @@ export function ValueViewer({ cell, onClose }) {
   const open = !!cell;
   const [full, setFull] = useState(null);      // { text, truncated, size } | { error }
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState('tree');
+  const [mode, setModeState] = useState(readView);
+  const setMode = (m) => { setModeState(m); try { window.localStorage.setItem(VIEW_KEY, m); } catch { /* storage blocked */ } };
+  const [previewDepth, setPreviewDepth] = useState(4);
+  const [previewKey, setPreviewKey] = useState(0);
   const [wrap, setWrap] = useState(true);
   const [query, setQuery] = useState('');
   const [hit, setHit] = useState(0);
@@ -264,7 +279,10 @@ export function ValueViewer({ cell, onClose }) {
     } catch { return null; }
   }, [text, isNull, preview]);
 
-  const view = parsed?.tree && mode === 'tree' ? 'tree' : 'text';
+  const canPreview = !isNull && !preview;
+  const canTree = !!parsed?.tree;
+  const available = VIEWS.filter(v => (v.id === 'preview' ? canPreview : v.id === 'tree' ? canTree : true));
+  const view = available.some(v => v.id === mode) ? mode : canPreview ? 'preview' : 'text';
   const shownText = parsed ? parsed.pretty : (text ?? '');
   const q = query.trim().toLowerCase();
 
@@ -370,6 +388,10 @@ export function ValueViewer({ cell, onClose }) {
       searchRef.current?.select();
     }
   };
+  const onSearch = (value) => {
+    setQuery(value);
+    if (value && view === 'preview') setMode(canTree ? 'tree' : 'text');
+  };
   const onSearchKey = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
     if (e.key === 'Escape' && query) { e.stopPropagation(); setQuery(''); }
@@ -384,18 +406,29 @@ export function ValueViewer({ cell, onClose }) {
   const drawnLines = lines.length > TEXT_MAX_LINES ? lines.slice(0, TEXT_MAX_LINES) : lines;
   const highlight = parsed && shownText.length <= HIGHLIGHT_MAX_CHARS;
 
+  const viewIdx = Math.max(0, available.findIndex(v => v.id === view));
+  const KindIcon = parsed ? Braces : FileText;
+
   return (
-    <Modal open={open} onClose={onClose} width={1040} labelledBy="sf-value-title">
-      <div className="flex flex-col h-[min(86vh,860px)] min-h-0" onKeyDown={onKeyDown}>
+    <Modal open={open} onClose={onClose} width={1180} labelledBy="sf-value-title">
+      <div className="vv-rise relative flex flex-col h-[min(90vh,940px)] min-h-0 bg-white" onKeyDown={onKeyDown}>
+        <style>{SHELL_CSS}</style>
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${E.accent}, ${E.mid} 45%, transparent)` }} />
+
         {/* header */}
-        <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-5 pt-4 pb-3 border-b border-[#e8e6e3]">
-          <div className="min-w-0 flex-1 basis-[220px]">
-            <h3 id="sf-value-title" className="font-johnson-display font-bold text-[16px] leading-tight text-[#312c2a] break-all">{cell?.title}</h3>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              {meta.map((m, i) => (
-                <span key={m} className={`inline-flex items-center h-[20px] px-2 rounded-full text-[11px] ${i === 0 && cell?.type ? 'font-mono bg-[var(--sig-soft)] text-[var(--sig-ink)]' : 'bg-[#f1efed] text-[#6e6259]'}`}>{m}</span>
-              ))}
-              {preview && !loading && <span className="inline-flex items-center h-[20px] px-2 rounded-full text-[11px] bg-[#fff3ea] text-[#a14a00]">Showing the start only</span>}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 sm:px-6 pt-5 pb-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1 basis-[260px]">
+            <span className="flex-shrink-0 w-[40px] h-[40px] rounded-[12px] flex items-center justify-center bg-[var(--sig-soft)] text-[var(--sig-ink)] ring-1 ring-inset ring-[var(--sig-mid)]">
+              <KindIcon size={19} strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <h3 id="sf-value-title" className="font-johnson-display font-bold text-[17px] leading-tight text-[#312c2a] break-all">{cell?.title}</h3>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {meta.map((m, i) => (
+                  <span key={m} className={`inline-flex items-center h-[20px] px-2 rounded-full text-[11px] tabular-nums ${i === 0 && cell?.type ? 'font-mono bg-[var(--sig-soft)] text-[var(--sig-ink)]' : 'bg-[#f1efed] text-[#6e6259]'}`}>{m}</span>
+                ))}
+                {preview && !loading && <span className="inline-flex items-center h-[20px] px-2 rounded-full text-[11px] bg-[#fff3ea] text-[#a14a00]">Showing the start only</span>}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1.5 ml-auto">
@@ -412,43 +445,64 @@ export function ValueViewer({ cell, onClose }) {
 
         {/* toolbar */}
         {!isNull && (
-          <div className="flex flex-wrap items-center gap-2 px-5 py-2 border-b border-[#e8e6e3] bg-[#fbfaf9]">
-            {parsed?.tree && (
-              <div role="tablist" aria-label="View" className="flex items-center gap-0.5 p-0.5 rounded-[9px] bg-[#efedea]">
-                <ViewTab active={view === 'tree'} onClick={() => setMode('tree')} icon={ListTree} accent={E.accent} title="Fold and unfold the JSON">Tree</ViewTab>
-                <ViewTab active={view === 'text'} onClick={() => setMode('text')} icon={AlignLeft} accent={E.accent} title="The formatted JSON as text">Text</ViewTab>
+          <div className="flex flex-wrap items-center gap-2 px-5 sm:px-6 pb-3 border-b border-[#e8e6e3]">
+            {available.length > 1 && (
+              <div role="tablist" aria-label="View" className="relative grid w-full sm:w-auto p-[3px] rounded-[11px] bg-[#f1efed]" style={{ gridTemplateColumns: `repeat(${available.length}, minmax(84px, 1fr))` }}>
+                <span
+                  aria-hidden="true"
+                  className="absolute top-[3px] bottom-[3px] left-[3px] rounded-[8px] bg-white shadow-[0_1px_2px_rgba(49,44,42,.14),0_0_0_1px_rgba(49,44,42,.04)] transition-transform duration-200 ease-[cubic-bezier(.2,.8,.2,1)]"
+                  style={{ width: `calc((100% - 6px) / ${available.length})`, transform: `translateX(${viewIdx * 100}%)` }}
+                />
+                {available.map(v => {
+                  const Icon = v.icon;
+                  const on = v.id === view;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => setMode(v.id)}
+                      className={`relative z-[1] inline-flex items-center justify-center gap-1.5 h-[28px] px-3 rounded-[8px] text-[12.5px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] ${on ? 'text-[#312c2a]' : 'text-[#6e6259] hover:text-[#312c2a]'}`}
+                    >
+                      <Icon size={14} strokeWidth={2} style={on ? { color: E.accent } : undefined} />{v.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
-            <div className="flex items-center flex-1 min-w-[200px] max-w-[420px] h-[30px] rounded-md border border-[#d5cfc9] bg-white focus-within:border-[var(--sig)] focus-within:ring-2 focus-within:ring-[var(--sig-ring)]">
-              <Search size={14} className="ml-2.5 flex-shrink-0 text-[#8a7f78]" aria-hidden="true" />
+            <div className="flex items-center flex-1 min-w-[200px] max-w-[440px] h-[34px] rounded-[10px] border border-[#e0dbd6] bg-white transition-[border-color,box-shadow] focus-within:border-[var(--sig)] focus-within:ring-2 focus-within:ring-[var(--sig-ring)]">
+              <Search size={14} className="ml-3 flex-shrink-0 text-[#8a7f78]" aria-hidden="true" />
               <input
                 ref={searchRef}
                 value={query}
-                onChange={e => setQuery(e.target.value)}
+                onChange={e => onSearch(e.target.value)}
                 onKeyDown={onSearchKey}
-                placeholder={view === 'tree' ? 'Search keys and values' : 'Search'}
+                placeholder={view === 'text' ? 'Search the text' : 'Search keys and values'}
                 aria-label="Search in this value"
                 className="flex-1 min-w-0 h-full px-2 bg-transparent text-[12.5px] text-[#312c2a] placeholder:text-[#a39992] focus:outline-none"
               />
-              {q && (
+              {q ? (
                 <>
                   <span className="flex-shrink-0 px-1 text-[11.5px] tabular-nums text-[#6e6259]" aria-live="polite">
                     {total ? `${current + 1} of ${fmtN(total)}${total >= MATCH_MAX ? '+' : ''}` : 'No matches'}
                   </span>
                   <IconButton icon={ChevronUp} label="Previous match (Shift+Enter)" size={24} iconSize={13} disabled={!total} onClick={() => step(-1)} />
                   <IconButton icon={ChevronDown} label="Next match (Enter)" size={24} iconSize={13} disabled={!total} onClick={() => step(1)} />
-                  <IconButton icon={X} label="Clear search" size={24} iconSize={13} className="mr-0.5" onClick={() => setQuery('')} />
+                  <IconButton icon={X} label="Clear search" size={24} iconSize={13} className="mr-1" onClick={() => setQuery('')} />
                 </>
+              ) : (
+                <kbd className="hidden sm:inline-flex mr-2 items-center h-[20px] px-1.5 rounded-[5px] border border-[#e0dbd6] bg-[#faf9f8] font-johnson-text text-[10.5px] text-[#8a7f78]">Ctrl F</kbd>
               )}
             </div>
             <div className="ml-auto flex items-center gap-1">
-              {view === 'tree' ? (
-                <>
-                  <Button icon={ChevronsUpDown} onClick={() => setAll(Infinity)}>Expand all</Button>
-                  <Button icon={ChevronsDownUp} onClick={() => setAll(1)}>Collapse all</Button>
-                </>
-              ) : (
+              {view === 'text' ? (
                 <Button icon={WrapText} onClick={() => setWrap(w => !w)} aria-pressed={wrap} className={wrap ? '!bg-[var(--sig-soft)] !text-[var(--sig-ink)]' : ''}>Wrap</Button>
+              ) : (
+                <>
+                  <Button icon={ChevronsUpDown} onClick={() => (view === 'tree' ? setAll(Infinity) : (setPreviewDepth(99), setPreviewKey(k => k + 1)))}>Expand all</Button>
+                  <Button icon={ChevronsDownUp} onClick={() => (view === 'tree' ? setAll(1) : (setPreviewDepth(0), setPreviewKey(k => k + 1)))}>Collapse all</Button>
+                </>
               )}
             </div>
           </div>
@@ -466,13 +520,15 @@ export function ValueViewer({ cell, onClose }) {
         )}
 
         {/* body */}
-        <div ref={bodyRef} className="relative flex-1 min-h-0 overflow-auto bg-white">
+        <div ref={bodyRef} className={`relative flex-1 min-h-0 overflow-auto ${view === 'preview' ? 'bg-[#f7f6f4]' : 'bg-white'}`}>
           {isNull ? (
             <div className="h-full flex items-center justify-center">
               <span className="px-3 py-1 rounded-full bg-[#f1efed] font-mono text-[12.5px] text-[#8a7f78]">NULL</span>
             </div>
+          ) : view === 'preview' ? (
+            <Preview key={previewKey} value={parsed ? parsed.value : text} openDepth={previewDepth} />
           ) : view === 'tree' ? (
-            <div role="tree" aria-label={`${cell?.title} value`} className="px-3 py-3">
+            <div role="tree" aria-label={`${cell?.title} value`} className="vv-in-soft px-3 py-3">
               {rows.slice(0, rowLimit).map((row) => {
                 const strOpen = isStringOpen(row.id);
                 return (
@@ -497,7 +553,7 @@ export function ValueViewer({ cell, onClose }) {
               )}
             </div>
           ) : (
-            <div className={`py-3 font-mono text-[12.5px] leading-[20px] text-[#312c2a] ${wrap ? '' : 'w-max min-w-full'}`}>
+            <div className={`vv-in-soft py-3 font-mono text-[12.5px] leading-[20px] text-[#312c2a] ${wrap ? '' : 'w-max min-w-full'}`}>
               {drawnLines.map((line, i) => (
                 <div key={i} data-line={i} className={`flex ${i === currentLine ? 'bg-[#fff3d6]' : ''}`}>
                   <span aria-hidden="true" className="sticky left-0 flex-shrink-0 w-[56px] pr-3 text-right select-none text-[#b8afa8] bg-inherit">{i + 1}</span>
@@ -521,10 +577,21 @@ export function ValueViewer({ cell, onClose }) {
             </div>
           )}
           {toast && toast !== 'Copied' && (
-            <div role="status" className="sticky bottom-3 float-right mr-4 px-3 py-1.5 rounded-lg bg-[#312c2a] text-white text-[12px] shadow-lg">{toast}</div>
+            <div role="status" className="vv-pop sticky bottom-3 float-right mr-4 px-3 py-1.5 rounded-lg bg-[#312c2a] text-white text-[12px] shadow-lg">{toast}</div>
           )}
         </div>
       </div>
     </Modal>
   );
 }
+
+// Shell motion: transform and opacity only, nothing blurred. The portal's
+// Reduce motion setting (html.reduce-motion in index.css) turns it off.
+const SHELL_CSS = `
+@keyframes vv-rise { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes vv-in-soft { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes vv-pop { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+.vv-rise { animation: vv-rise .22s cubic-bezier(.2,.8,.2,1) both; }
+.vv-in-soft { animation: vv-in-soft .18s ease-out both; }
+.vv-pop { animation: vv-pop .2s cubic-bezier(.2,.8,.2,1) both; }
+`;
