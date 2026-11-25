@@ -79,10 +79,14 @@ const nestedJson = cached((s) => {
 // Shown in a row of a property list (as opposed to a section of its own).
 const isInline = (v) => isScalar(v) && !(typeof v === 'string' && (isLongText(v) || imageOf(v) || isPdf(v) || nestedJson(v)));
 
+const ACRONYMS = new Set(['id', 'ocr', 'url', 'uri', 'pdf', 'api', 'uuid', 'json', 'xml', 'html', 'csv', 'sql', 'png', 'jpg', 'jpeg', 'ip', 'ui', 'utc', 'edms', 'rim', 'rmp', 's3']);
 const humanize = (k) => {
   if (typeof k === 'number') return `#${k + 1}`;
   const s = String(k).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_\-.]+/g, ' ').trim();
-  return s ? s[0].toUpperCase() + s.slice(1) : String(k);
+  if (!s) return String(k);
+  const words = s.split(' ').map(w => (ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w));
+  const out = words.join(' ');
+  return out[0].toUpperCase() + out.slice(1);
 };
 const singular = (k) => {
   const s = humanize(k);
@@ -170,59 +174,99 @@ const pdfUrl = (s) => {
 const NUM = new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 });
 
 function Scalar({ v, k }) {
-  if (v === null || v === undefined) return <span className="text-[#a39992] italic">empty</span>;
+  if (v === null || v === undefined) return <span className="text-[#b3aaa3]">—</span>;
   if (typeof v === 'boolean') {
     return (
-      <span className={`inline-flex items-center gap-1.5 h-[20px] px-2 rounded-full text-[11.5px] font-medium ${v ? 'bg-[#e9f6e4] text-[#286d10]' : 'bg-[#f1efed] text-[#6e6259]'}`}>
-        <span className={`w-[6px] h-[6px] rounded-full ${v ? 'bg-[#3c9a1c]' : 'bg-[#a39992]'}`} />{v ? 'Yes' : 'No'}
+      <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${v ? 'text-[#1f7a3a]' : 'text-[#8a7f78]'}`}>
+        <span className={`w-[7px] h-[7px] rounded-full ${v ? 'bg-[#2fb15a]' : 'bg-[#cfc8c1]'}`} />{v ? 'Yes' : 'No'}
       </span>
     );
   }
   const date = asDate(v, k);
   if (date) {
     const text = date.dateOnly ? date.d.toLocaleDateString(undefined, { dateStyle: 'medium' }) : date.d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-    return <span title={String(v)} className="text-[#312c2a]">{text}<span className="ml-1.5 text-[#8a7f78] text-[11.5px]">{relative(date.d)}</span></span>;
+    return <span title={String(v)}>{text}<span className="ml-1.5 text-[12px] text-[#8a7f78]">{relative(date.d)}</span></span>;
   }
   if (typeof v === 'number') {
-    const bytes = k && BYTES_KEY.test(String(k)) && Number.isInteger(v) && v >= 1024;
-    return (
-      <span className="font-mono tabular-nums text-[#0b5cad]">
-        {NUM.format(v)}{bytes && <span className="ml-1.5 font-johnson-text text-[11.5px] text-[#8a7f78]">{formatBytes(v)}</span>}
-      </span>
-    );
+    const bytes = k && BYTES_KEY.test(String(k)) && Number.isInteger(v);
+    return bytes
+      ? <span className="tabular-nums" title={`${NUM.format(v)} bytes`}>{formatBytes(v)}</span>
+      : <span className="tabular-nums">{NUM.format(v)}</span>;
   }
   const s = String(v);
-  if (!s) return <span className="text-[#a39992] italic">blank</span>;
+  if (!s) return <span className="text-[#b3aaa3]">—</span>;
   if (URL_RE.test(s)) {
     return (
-      <a href={s} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 max-w-full text-[var(--sig-ink)] underline decoration-[var(--sig-mid)] underline-offset-2 hover:decoration-[var(--sig)] [overflow-wrap:anywhere]">
-        {s}<ExternalLink size={11} className="flex-shrink-0" />
+      <a href={s} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 max-w-full font-medium text-[var(--sig-ink)] hover:underline underline-offset-2 [overflow-wrap:anywhere]">
+        {s.replace(/^https?:\/\//, '')}<ExternalLink size={12} className="flex-shrink-0 opacity-70" />
       </a>
     );
   }
-  if (EMAIL_RE.test(s)) {
-    return <a href={`mailto:${s}`} className="inline-flex items-center gap-1 text-[var(--sig-ink)] hover:underline"><Mail size={11} />{s}</a>;
-  }
-  if (COLOR_RE.test(s)) {
-    return <span className="inline-flex items-center gap-1.5 font-mono"><span className="w-[14px] h-[14px] rounded-[4px] border border-black/10" style={{ background: s }} />{s}</span>;
-  }
+  if (EMAIL_RE.test(s)) return <a href={`mailto:${s}`} className="inline-flex items-center gap-1 font-medium text-[var(--sig-ink)] hover:underline"><Mail size={12} />{s}</a>;
+  if (COLOR_RE.test(s)) return <span className="inline-flex items-center gap-2"><span className="w-[14px] h-[14px] rounded-full ring-1 ring-black/10" style={{ background: s }} />{s.toUpperCase()}</span>;
   if (UUID_RE.test(s)) return <span className="font-mono text-[12px] text-[#4a423e]">{s}</span>;
-  return <span className="text-[#312c2a] [overflow-wrap:anywhere]">{s}</span>;
+  return <span className="[overflow-wrap:anywhere]">{s}</span>;
 }
 
-/* ------------------------------ blocks ------------------------------ */
+/* ------------------------------ building blocks ------------------------------ */
 
-function Prose({ text }) {
+const Pill = ({ children, title }) => (
+  <span title={title} className="inline-flex items-center h-[22px] px-2.5 rounded-full bg-[#f3f1ef] text-[11.5px] text-[#5c534e] tabular-nums whitespace-nowrap">{children}</span>
+);
+
+// A field: small label over its value. Laid out as a responsive grid of tiles.
+function Specs({ entries }) {
+  return (
+    <dl className="m-0 grid gap-2 grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
+      {entries.map(([k, v]) => (
+        <div key={k} className="min-w-0 rounded-xl bg-[#f8f7f5] px-3.5 py-2.5">
+          <dt title={k} className="truncate text-[11px] font-medium uppercase tracking-[.06em] text-[#8a7f78]">{humanize(k)}</dt>
+          <dd className="m-0 mt-1 text-[14px] leading-snug text-[#211d1b] break-words"><Scalar v={v} k={k} /></dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+// Short facts of a record as one row of pills: "OCR used ● No".
+function Facts({ entries }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {entries.map(([k, v]) => (
+        <span key={k} title={k} className="inline-flex items-center gap-2 min-h-[30px] px-3.5 py-1 rounded-full bg-[#f6f4f2] text-[13px] text-[#211d1b]">
+          <span className="text-[12px] text-[#8a7f78]">{humanize(k)}</span><Scalar v={v} k={k} />
+        </span>
+      ))}
+    </div>
+  );
+}
+const factsFit = (entries) => entries.length <= 6 && entries.every(([, v]) => String(v ?? '').length <= 48);
+
+// A labelled part of a record: "TEXT", "IMAGES 2"...
+function Block({ label, meta, children }) {
+  return (
+    <div className="mt-5 first:mt-0">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[.08em] text-[#6e6259]">{label}</span>
+        {meta && <span className="text-[11px] tabular-nums text-[#a39992]">{meta}</span>}
+        <span className="flex-1 h-px bg-[#efecea]" aria-hidden="true" />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Reading({ text }) {
   const [all, setAll] = useState(false);
   const cut = text.length > TEXT_CLAMP && !all;
   const words = useMemo(() => (text.match(/\S+/g) || []).length, [text]);
   return (
-    <div>
-      <div className={`relative max-w-[82ch] whitespace-pre-wrap [overflow-wrap:anywhere] text-[13.5px] leading-[1.7] text-[#312c2a] ${cut ? 'vv-fade' : ''}`}>
+    <div className="rounded-2xl border border-[#efecea] bg-[#fcfbfa] px-5 py-4">
+      <div className={`max-w-[74ch] whitespace-pre-wrap [overflow-wrap:anywhere] text-[14px] leading-[1.75] text-[#2b2523] ${cut ? 'vv-fade' : ''}`}>
         {cut ? `${text.slice(0, TEXT_CLAMP)}…` : text}
       </div>
-      <div className="mt-2 flex items-center gap-3 text-[11.5px] text-[#8a7f78]">
-        <span>{fmtN(words)} words · {fmtN(text.length)} characters</span>
+      <div className="mt-3 flex items-center gap-3 text-[11.5px] text-[#8a7f78]">
+        <span className="tabular-nums">{fmtN(words)} words</span>
         {text.length > TEXT_CLAMP && (
           <button type="button" onClick={() => setAll(a => !a)} className="font-medium text-[var(--sig-ink)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] rounded">
             {all ? 'Show less' : 'Read all'}
@@ -233,61 +277,16 @@ function Prose({ text }) {
   );
 }
 
-function Figure({ img, id, caption, onOpen }) {
-  const [failed, setFailed] = useState(false);
-  const [dims, setDims] = useState(null);
-  const w = caption?.width ?? dims?.w;
-  const h = caption?.height ?? dims?.h;
-  const name = caption?.name || `image.${extOf(img.mime)}`;
-  return (
-    <figure className="m-0 group/fig">
-      <button
-        type="button"
-        onClick={() => !failed && onOpen(id)}
-        className="relative flex w-full items-center justify-center p-3 sm:p-4 rounded-[10px] border border-[#e8e6e3] bg-[#f4f2f0] overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] cursor-zoom-in"
-        aria-label={`Open ${name} full size`}
-      >
-        {failed ? (
-          <div className="h-[140px] flex items-center justify-center text-[12px] text-[#8a7f78]">This image could not be read</div>
-        ) : (
-          <img
-            src={img.src}
-            alt={name}
-            loading="lazy"
-            decoding="async"
-            onLoad={e => setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-            onError={() => setFailed(true)}
-            className="vv-checker vv-paper block max-h-[440px] max-w-full rounded-[3px]"
-          />
-        )}
-        {!failed && (
-          <span className="absolute top-2 right-2 inline-flex items-center justify-center w-[28px] h-[28px] rounded-lg bg-[#312c2a]/80 text-white opacity-0 group-hover/fig:opacity-100 transition-opacity duration-150">
-            <Maximize2 size={13} />
-          </span>
-        )}
-      </button>
-      <figcaption className="mt-2 flex flex-wrap items-center gap-1.5 text-[11.5px] text-[#6e6259]">
-        <Chip>{img.mime.replace('image/', '').toUpperCase()}</Chip>
-        {w && h && <Chip>{fmtN(w)} × {fmtN(h)}</Chip>}
-        <Chip>{formatBytes(caption?.bytes ?? img.bytes)}</Chip>
-        <button type="button" onClick={() => downloadData(img.src, name)} className="ml-auto inline-flex items-center gap-1 font-medium text-[var(--sig-ink)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] rounded">
-          <Download size={12} />Save image
-        </button>
-      </figcaption>
-    </figure>
-  );
-}
-
 function PdfCard({ s, name }) {
   const bytes = b64Bytes(s.startsWith('data:') ? s.slice(s.indexOf(',') + 1) : s);
   const open = () => { const u = pdfUrl(s); window.open(u, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(u), 60_000); };
   const save = () => { const u = pdfUrl(s); downloadData(u, `${name || 'document'}.pdf`); setTimeout(() => URL.revokeObjectURL(u), 10_000); };
   return (
-    <div className="flex items-center gap-3 p-3 rounded-[10px] border border-[#e8e6e3] bg-white">
-      <span className="w-[38px] h-[38px] flex-shrink-0 rounded-lg bg-[#fdeceb] text-[#b42318] flex items-center justify-center"><FileText size={18} /></span>
-      <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-[#312c2a]">PDF document</div>
-        <div className="text-[11.5px] text-[#8a7f78]">{formatBytes(bytes)}</div>
+    <div className="inline-flex items-center gap-3 p-2.5 pr-3 rounded-2xl border border-[#efecea] bg-white">
+      <span className="w-[40px] h-[40px] flex-shrink-0 rounded-xl bg-[#fdeceb] text-[#b42318] flex items-center justify-center"><FileText size={18} /></span>
+      <div className="min-w-0 mr-2">
+        <div className="text-[13px] font-medium text-[#211d1b]">PDF document</div>
+        <div className="text-[11.5px] text-[#8a7f78] tabular-nums">{formatBytes(bytes)}</div>
       </div>
       <button type="button" onClick={open} className="vv-btn">Open</button>
       <button type="button" onClick={save} className="vv-btn">Save</button>
@@ -295,122 +294,187 @@ function PdfCard({ s, name }) {
   );
 }
 
-const Chip = ({ children }) => <span className="inline-flex items-center h-[20px] px-2 rounded-full bg-[#f1efed] text-[11px] text-[#6e6259] tabular-nums">{children}</span>;
+const More = ({ left, page, onMore }) => (
+  <div className="pt-1 text-center">
+    <button type="button" onClick={onMore} className="vv-btn">Show {fmtN(Math.min(page, left))} more · {fmtN(left)} left</button>
+  </div>
+);
 
-function Section({ title, meta, depth, children, defaultOpen, className = '' }) {
-  const [open, setOpen] = useState(defaultOpen);
+const metaOf = (v) => {
+  if (Array.isArray(v)) return v.length ? fmtN(v.length) : 'empty';
+  if (v && typeof v === 'object') return `${fmtN(Object.keys(v).length)} fields`;
+  if (typeof v === 'string') return imageOf(v) ? 'image' : isPdf(v) ? 'PDF' : nestedJson(v) ? 'JSON' : '';
+  return '';
+};
+const isEmptyBox = (v) => v && typeof v === 'object' && (Array.isArray(v) ? v.length === 0 : Object.keys(v).length === 0);
+
+/* ------------------------------ media ------------------------------ */
+
+// What an image record says that the tile already shows.
+const IMAGE_SHOWN_KEYS = new Set(['ext', 'extension', 'format', 'mime', 'mime_type', 'content_type', 'bytes', 'size', 'width', 'height', 'name', 'filename', 'file_name']);
+const imageKeyOf = (obj) => Object.keys(obj).find(key => imageOf(obj[key]));
+// The rest of an image record worth a pill: not what the tile shows, not false or empty.
+const imageExtras = (obj, imgKey) => Object.entries(obj).filter(([k, v]) => k !== imgKey && !IMAGE_SHOWN_KEYS.has(k) && isInline(v) && v !== false && v !== null && v !== '');
+
+// An image on a neutral mat sized to it: small marks stay small, pages stand
+// tall, charts lie wide. Label and facts sit underneath, never on top.
+const TILE_H = 168;
+function MediaTile({ img, id, label, rec, onOpen, extra }) {
+  const [dims, setDims] = useState(rec && num(rec.width) && num(rec.height) ? { w: rec.width, h: rec.height } : null);
+  const [failed, setFailed] = useState(false);
+  const small = dims && dims.w <= 96 && dims.h <= 96;
+  const matH = small ? 112 : TILE_H;
+  const ratio = dims ? dims.w / dims.h : 0.8;
+  const width = small ? 112 : Math.round(Math.min(300, Math.max(120, matH * ratio)));
+  const name = rec?.name || rec?.filename || rec?.file_name || `image.${extOf(img.mime)}`;
+  const bytes = rec ? (num(rec.bytes) ?? num(rec.size) ?? img.bytes) : img.bytes;
   return (
-    <section className={`${depth === 0 ? 'vv-card' : 'mt-1'} ${className}`}>
-      <h4 className="m-0">
-        <button
-          type="button"
-          onClick={() => setOpen(o => !o)}
-          aria-expanded={open}
-          className={`w-full flex items-center gap-2 text-left rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] ${depth === 0 ? 'px-4 py-3' : 'py-1.5'}`}
-        >
-          <ChevronRight size={14} className={`flex-shrink-0 text-[#8a7f78] transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
-          <span className={`font-johnson-display font-bold text-[#312c2a] ${depth === 0 ? 'text-[14px]' : 'text-[13px]'}`}>{title}</span>
-          {meta && <span className="text-[11.5px] text-[#8a7f78] font-normal">{meta}</span>}
+    <figure className="m-0 flex-shrink-0" style={{ width: width + 16 }}>
+      <button
+        type="button"
+        onClick={() => !failed && onOpen(id)}
+        aria-label={`Open ${name} full size`}
+        title={label}
+        className="group/t relative flex w-full items-center justify-center rounded-2xl bg-[#f3f1ef] overflow-hidden transition-colors hover:bg-[#ece9e6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] cursor-zoom-in"
+        style={{ height: matH }}
+      >
+        {failed ? <span className="text-[11.5px] text-[#8a7f78] px-2 text-center">Can’t read this image</span> : (
+          <img
+            src={img.src}
+            alt={name}
+            loading="lazy"
+            decoding="async"
+            onLoad={e => { if (!dims) setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); }}
+            onError={() => setFailed(true)}
+            className="vv-checker vv-paper block max-w-[calc(100%-20px)] max-h-[calc(100%-20px)] rounded-[4px] transition-transform duration-200 group-hover/t:scale-[1.03]"
+          />
+        )}
+        <span className="absolute top-2 right-2 w-[26px] h-[26px] rounded-full bg-white/90 text-[#312c2a] flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,.15)] opacity-0 group-hover/t:opacity-100 transition-opacity">
+          <Maximize2 size={12} />
+        </span>
+      </button>
+      <figcaption className="mt-2 px-0.5">
+        {label && <div className="truncate text-[12.5px] font-medium text-[#211d1b]">{label}</div>}
+        <div className="truncate text-[11.5px] text-[#8a7f78] tabular-nums">
+          {[img.mime.replace('image/', '').replace('svg+xml', 'svg').toUpperCase(), dims ? `${dims.w}×${dims.h}` : null, formatBytes(bytes)].filter(Boolean).join(' · ')}
+        </div>
+        {extra?.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {extra.map(([k, v]) => <Pill key={k} title={k}>{v === true ? humanize(k) : `${humanize(k)}: ${String(v)}`}</Pill>)}
+          </div>
+        )}
+        <button type="button" onClick={() => downloadData(img.src, name)} className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-medium text-[var(--sig-ink)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] rounded">
+          <Download size={11} />Save
         </button>
-      </h4>
-      {open && <div className={`vv-in-soft ${depth === 0 ? 'px-4 pb-4' : 'pl-[22px] pb-2'}`}>{children}</div>}
-    </section>
+      </figcaption>
+    </figure>
   );
 }
 
-const metaOf = (v) => {
-  if (Array.isArray(v)) return v.length ? `${fmtN(v.length)} ${v.length === 1 ? 'item' : 'items'}` : 'empty';
-  if (v && typeof v === 'object') { const n = Object.keys(v).length; return `${fmtN(n)} ${n === 1 ? 'field' : 'fields'}`; }
-  if (typeof v === 'string') {
-    if (imageOf(v)) return 'image';
-    if (isPdf(v)) return 'PDF';
-    if (nestedJson(v)) return 'JSON in text';
-    return `${fmtN(v.length)} characters`;
-  }
-  return '';
+// Images, or records that each carry one, as a wrapping grid of tiles.
+function MediaGrid({ items, path, ctx, unit }) {
+  return (
+    <div className="flex flex-wrap gap-4">
+      {items.map((it, i) => {
+        if (typeof it === 'string') {
+          return <MediaTile key={i} img={imageOf(it)} id={pathId([...path, i])} label={`${unit} ${i + 1}`} onOpen={ctx.onOpenImage} />;
+        }
+        const key = imageKeyOf(it);
+        const extra = imageExtras(it, key);
+        return <MediaTile key={i} img={imageOf(it[key])} id={pathId([...path, i, key])} label={`${unit} ${i + 1}`} rec={it} extra={extra} onOpen={ctx.onOpenImage} />;
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------ records ------------------------------ */
+
+const HEADING_KEYS = ['title', 'name', 'label', 'filename', 'file_name', 'page_number', 'page', 'number', 'id', 'key'];
+const headingField = (obj) => HEADING_KEYS.find(h => (typeof obj[h] === 'string' && obj[h] && obj[h].length <= 80) || typeof obj[h] === 'number');
+const headingOf = (obj, parentKey, i) => {
+  const unit = singular(parentKey ?? 'item');
+  const h = headingField(obj);
+  if (!h) return `${unit} ${i + 1}`;
+  return /number|page|^id$/.test(h) && typeof obj[h] === 'number' ? `${unit} ${obj[h]}` : String(obj[h]);
 };
 
-/* ------------------------------ structure ------------------------------ */
-
-const isEmptyBox = (v) => v && typeof v === 'object' && (Array.isArray(v) ? v.length === 0 : Object.keys(v).length === 0);
-
-function Fields({ obj, path, depth, ctx }) {
-  const entries = Object.entries(obj);
+// A record's contents: its simple fields as tiles, then each bigger part.
+function RecordBody({ obj, path, depth, ctx, hide }) {
+  const entries = Object.entries(obj).filter(([k]) => !hide?.has(k));
   const inline = entries.filter(([, v]) => isInline(v));
   const empties = entries.filter(([, v]) => isEmptyBox(v)).map(([k]) => k);
   const blocks = entries.filter(([, v]) => !isInline(v) && !isEmptyBox(v));
-  if (!entries.length) return <Empty>No fields</Empty>;
+  if (!entries.length) return <div className="text-[12.5px] text-[#a39992]">Nothing here</div>;
   return (
     <div>
-      {inline.length > 0 && (
-        <dl className="m-0 grid grid-cols-[minmax(110px,max-content)_minmax(0,1fr)] max-sm:grid-cols-1 gap-x-6 gap-y-0 text-[13px]">
-          {inline.map(([k, v]) => (
-            <div key={k} className="contents">
-              <dt title={k} className="py-1.5 text-[12px] text-[#766a63] max-sm:pb-0 border-b border-[#f1efed] max-sm:border-0">{humanize(k)}</dt>
-              <dd className="m-0 py-1.5 min-w-0 border-b border-[#f1efed]"><Scalar v={v} k={k} /></dd>
-            </div>
-          ))}
-        </dl>
-      )}
+      {inline.length > 0 && (depth > 0 && factsFit(inline) ? <Facts entries={inline} /> : <Specs entries={inline} />)}
       {blocks.map(([k, v]) => (
-        <Section key={k} title={humanize(k)} meta={metaOf(v)} depth={depth + 1} defaultOpen={ctx.openDepth > depth + 1}>
-          <Node v={v} k={k} path={[...path, k]} depth={depth + 1} ctx={ctx} />
-        </Section>
+        <div key={k} className={inline.length ? 'mt-5' : ''}>
+          <Block label={humanize(k)} meta={metaOf(v)}>
+            <Node v={v} k={k} path={[...path, k]} depth={depth + 1} ctx={ctx} />
+          </Block>
+        </div>
       ))}
       {empties.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11.5px] text-[#8a7f78]">
-          <span>Empty</span>
-          {empties.map(k => <span key={k} title={k} className="inline-flex items-center h-[20px] px-2 rounded-full border border-dashed border-[#d5cfc9]">{humanize(k)}</span>)}
+        <div className="mt-4 flex flex-wrap items-center gap-1.5 text-[11.5px] text-[#a39992]">
+          <span>No {empties.map(k => humanize(k).toLowerCase()).join(empties.length === 2 ? ' or ' : ', ')}</span>
         </div>
       )}
     </div>
   );
 }
 
-const Empty = ({ children }) => <div className="py-1 text-[12.5px] text-[#a39992] italic">{children}</div>;
-
-// An object that carries an image: the picture first, its record beside it.
-function ImageRecord({ obj, imgKey, path, depth, ctx }) {
-  const img = imageOf(obj[imgKey]);
-  const rest = Object.fromEntries(Object.entries(obj).filter(([k]) => k !== imgKey));
+// One record of a list, as a card you can fold. Its title comes from the
+// record (page_number 3 makes "Page 3"), the summary from what is inside.
+function RecordCard({ item, i, k, path, depth, ctx, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const isObj = item && typeof item === 'object' && !Array.isArray(item);
+  const title = isObj ? headingOf(item, k, i) : `${singular(k ?? 'item')} ${i + 1}`;
+  const hk = isObj ? headingField(item) : null;
+  const badge = isObj && hk && typeof item[hk] === 'number' ? item[hk] : i + 1;
+  const summary = useMemo(() => {
+    if (!isObj) return [];
+    const out = [];
+    for (const [key, v] of Object.entries(item)) {
+      if (typeof v === 'string' && isLongText(v) && !imageOf(v)) out.push(`${fmtN((v.match(/\S+/g) || []).length)} words`);
+      else if (Array.isArray(v) && v.length) out.push(`${fmtN(v.length)} ${v.length === 1 ? singular(key).toLowerCase() : humanize(key).toLowerCase()}`);
+    }
+    return out.slice(0, 4);
+  }, [item, isObj]);
+  const nested = depth > 1;
   return (
-    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(200px,280px)] items-start">
-      <Figure img={img} id={pathId([...path, imgKey])} caption={{ width: num(obj.width), height: num(obj.height), bytes: num(obj.bytes) ?? num(obj.size) ?? undefined, name: obj.name || obj.filename || obj.file_name }} onOpen={ctx.onOpenImage} />
-      {Object.keys(rest).length > 0 && <Fields obj={rest} path={path} depth={depth} ctx={ctx} />}
-    </div>
+    <section className={`vv-cv overflow-hidden ${nested ? 'rounded-2xl border border-[#efecea] bg-[#fcfbfa]' : 'vv-card'}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[#faf9f8] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--sig-ring)]"
+      >
+        <span className="flex-shrink-0 min-w-[30px] h-[30px] px-1.5 rounded-[10px] bg-[var(--sig-soft)] text-[var(--sig-ink)] text-[12.5px] font-semibold tabular-nums flex items-center justify-center">{badge}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-johnson-display font-bold text-[14.5px] text-[#211d1b]">{title}</span>
+          {summary.length > 0 && <span className="block truncate text-[11.5px] text-[#8a7f78] tabular-nums">{summary.join(' · ')}</span>}
+        </span>
+        <ChevronRight size={16} className={`flex-shrink-0 text-[#a39992] transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="vv-in-soft px-4 pb-4 pt-1">
+          {isObj ? <RecordBody obj={item} path={[...path, i]} depth={depth + 1} ctx={ctx} hide={hk && /number|page|^id$/.test(hk) ? new Set([hk]) : null} />
+            : <Node v={item} k={i} path={[...path, i]} depth={depth + 1} ctx={ctx} />}
+        </div>
+      )}
+    </section>
   );
 }
 
-const HEADING_KEYS = ['title', 'name', 'label', 'filename', 'file_name', 'page_number', 'page', 'number', 'id', 'key'];
-const headingOf = (obj, parentKey, i) => {
-  const unit = singular(parentKey ?? 'item');
-  for (const h of HEADING_KEYS) {
-    const v = obj[h];
-    if ((typeof v === 'string' && v && v.length <= 80) || typeof v === 'number') {
-      return /number|page|^id$/.test(h) && typeof v === 'number' ? `${unit} ${v}` : String(v);
-    }
-  }
-  return `${unit} ${i + 1}`;
-};
-
-function Cards({ arr, k, path, depth, ctx }) {
+function RecordCards({ arr, k, path, depth, ctx }) {
   const [shown, setShown] = useState(CARDS_PAGE);
   return (
     <div className="space-y-3">
       {arr.slice(0, shown).map((item, i) => (
-        <Section key={i} className="vv-cv" title={item && typeof item === 'object' ? headingOf(item, k, i) : `${singular(k ?? 'item')} ${i + 1}`} meta={metaOf(item)} depth={0} defaultOpen={(i < 3 && ctx.openDepth > 0) || ctx.openDepth > 3}>
-          <Node v={item} k={i} path={[...path, i]} depth={depth + 1} ctx={ctx} />
-        </Section>
+        <RecordCard key={i} item={item} i={i} k={k} path={path} depth={depth} ctx={ctx} defaultOpen={(i < 3 && ctx.openDepth > 0) || ctx.openDepth > 3} />
       ))}
       {arr.length > shown && <More left={arr.length - shown} page={CARDS_PAGE} onMore={() => setShown(s => s + CARDS_PAGE)} />}
-    </div>
-  );
-}
-
-function More({ left, page, onMore }) {
-  return (
-    <div className="pt-1 text-center">
-      <button type="button" onClick={onMore} className="vv-btn">Show {fmtN(Math.min(page, left))} more · {fmtN(left)} left</button>
     </div>
   );
 }
@@ -419,24 +483,22 @@ function Table({ arr, cols }) {
   const [shown, setShown] = useState(TABLE_PAGE);
   return (
     <div>
-      <div className="overflow-auto max-h-[520px] rounded-[10px] border border-[#e8e6e3] bg-white">
-        <table className="w-full border-collapse text-[12.5px]">
-          <thead className="sticky top-0 z-[1] bg-[#f8f7f5]">
+      <div className="overflow-auto max-h-[520px] rounded-2xl border border-[#efecea] bg-white">
+        <table className="w-full border-collapse text-[13px]">
+          <thead className="sticky top-0 z-[1] bg-white">
             <tr>
-              <th className="px-3 py-2 text-right font-medium text-[11px] text-[#a39992] border-b border-[#e8e6e3] w-[1%]">#</th>
-              {cols.map(c => <th key={c} title={c} className="px-3 py-2 text-left font-medium text-[11.5px] text-[#6e6259] border-b border-[#e8e6e3] whitespace-nowrap">{humanize(c)}</th>)}
+              {cols.map(c => <th key={c} title={c} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-[#8a7f78] border-b border-[#efecea] whitespace-nowrap">{humanize(c)}</th>)}
             </tr>
           </thead>
           <tbody>
             {arr.slice(0, shown).map((row, i) => (
               <tr key={i} className="hover:bg-[#faf9f8]">
-                <td className="px-3 py-1.5 text-right text-[11px] tabular-nums text-[#b8afa8] border-b border-[#f1efed]">{i + 1}</td>
                 {cols.map(c => {
                   const v = row?.[c];
                   return (
-                    <td key={c} className="px-3 py-1.5 border-b border-[#f1efed] align-top max-w-[360px]">
+                    <td key={c} className="px-4 py-2.5 border-b border-[#f4f2f0] align-top max-w-[360px] text-[#211d1b]">
                       {v === undefined ? <span className="text-[#d5cfc9]">—</span> : isScalar(v) && !isLongText(v) ? <Scalar v={v} k={c} />
-                        : <span className="text-[#8a7f78] line-clamp-2" title={typeof v === 'string' ? v.slice(0, 600) : undefined}>{typeof v === 'string' ? v : metaOf(v)}</span>}
+                        : <span className="text-[#6e6259] line-clamp-2" title={typeof v === 'string' ? v.slice(0, 600) : undefined}>{typeof v === 'string' ? v : metaOf(v)}</span>}
                     </td>
                   );
                 })}
@@ -464,48 +526,49 @@ const tableColumns = (arr) => {
   const shared = cols.filter(c => count.get(c) >= sample.length * 0.6).length;
   return shared / cols.length >= 0.6 ? cols : null;
 };
+const isMediaList = (arr) => arr.length > 0 && arr.every(v => (typeof v === 'string' && imageOf(v)) || (v && typeof v === 'object' && !Array.isArray(v) && imageKeyOf(v)));
 
 function List({ arr, k, path, depth, ctx }) {
-  if (!arr.length) return <Empty>Empty list</Empty>;
+  if (!arr.length) return <div className="text-[12.5px] text-[#a39992]">Empty</div>;
+  if (isMediaList(arr)) return <MediaGrid items={arr} path={path} ctx={ctx} unit={singular(k ?? 'image')} />;
   if (arr.every(v => isInline(v))) {
-    const short = arr.length <= CHIPS_MAX && arr.every(v => String(v).length <= 40);
-    if (short) {
-      return (
-        <div className="flex flex-wrap gap-1.5">
-          {arr.map((v, i) => <span key={i} className="inline-flex items-center min-h-[24px] px-2.5 rounded-full border border-[#e8e6e3] bg-white text-[12.5px]"><Scalar v={v} /></span>)}
-        </div>
-      );
+    if (arr.length <= CHIPS_MAX && arr.every(v => String(v).length <= 40)) {
+      return <div className="flex flex-wrap gap-1.5">{arr.map((v, i) => <span key={i} className="inline-flex items-center h-[28px] px-3 rounded-full bg-[#f3f1ef] text-[13px] text-[#211d1b]"><Scalar v={v} /></span>)}</div>;
     }
     return (
-      <ol className="m-0 pl-0 list-none space-y-1">
+      <ol className="m-0 p-0 list-none divide-y divide-[#f4f2f0] rounded-2xl border border-[#efecea] bg-white">
         {arr.slice(0, 500).map((v, i) => (
-          <li key={i} className="flex gap-3 text-[13px]"><span className="w-[32px] flex-shrink-0 text-right tabular-nums text-[#b8afa8]">{i + 1}</span><Scalar v={v} /></li>
+          <li key={i} className="flex gap-4 px-4 py-2 text-[13px] text-[#211d1b]"><span className="w-[28px] flex-shrink-0 text-right tabular-nums text-[#b3aaa3]">{i + 1}</span><Scalar v={v} /></li>
         ))}
-        {arr.length > 500 && <li className="pl-[44px] text-[12px] text-[#8a7f78]">and {fmtN(arr.length - 500)} more (see Tree or Raw)</li>}
+        {arr.length > 500 && <li className="px-4 py-2 text-[12px] text-[#8a7f78]">and {fmtN(arr.length - 500)} more in Tree or Raw</li>}
       </ol>
     );
   }
   const cols = tableColumns(arr);
   if (cols) return <Table arr={arr} cols={cols} />;
-  return <Cards arr={arr} k={k} path={path} depth={depth} ctx={ctx} />;
+  return <RecordCards arr={arr} k={k} path={path} depth={depth} ctx={ctx} />;
 }
 
 const Node = memo(function Node({ v, k, path, depth, ctx }) {
   const kind = kindOf(v);
   if (kind === 'array') return <List arr={v} k={k} path={path} depth={depth} ctx={ctx} />;
   if (kind === 'object') {
-    const imgKey = Object.keys(v).find(key => imageOf(v[key]));
-    return imgKey ? <ImageRecord obj={v} imgKey={imgKey} path={path} depth={depth} ctx={ctx} /> : <Fields obj={v} path={path} depth={depth} ctx={ctx} />;
+    const imgKey = imageKeyOf(v);
+    if (imgKey) {
+      const extra = imageExtras(v, imgKey);
+      return <MediaTile img={imageOf(v[imgKey])} id={pathId([...path, imgKey])} rec={v} extra={extra} onOpen={ctx.onOpenImage} />;
+    }
+    return <RecordBody obj={v} path={path} depth={depth} ctx={ctx} />;
   }
   if (typeof v === 'string') {
     const img = imageOf(v);
-    if (img) return <Figure img={img} id={pathId(path)} onOpen={ctx.onOpenImage} />;
+    if (img) return <MediaTile img={img} id={pathId(path)} onOpen={ctx.onOpenImage} />;
     if (isPdf(v)) return <PdfCard s={v} name={typeof k === 'string' ? k : null} />;
     const inner = nestedJson(v);
     if (inner) return <Node v={inner} k={k} path={path} depth={depth} ctx={ctx} />;
-    if (isLongText(v)) return <Prose text={v} />;
+    if (isLongText(v)) return <Reading text={v} />;
   }
-  return <Scalar v={v} k={k} />;
+  return <span className="text-[14px] text-[#211d1b]"><Scalar v={v} k={k} /></span>;
 });
 
 /* ------------------------------ overview ------------------------------ */
@@ -520,61 +583,32 @@ const statsOf = (root, media) => {
     if (typeof v === 'string') { if (v.length > 40 && !imageOf(v) && !isPdf(v)) words += (v.match(/\S+/g) || []).length; }
     else if (v && typeof v === 'object') for (const c of Array.isArray(v) ? v : Object.values(v)) stack.push(c);
   }
-  const chips = [];
+  const out = [];
   if (root && typeof root === 'object' && !Array.isArray(root)) {
-    for (const [k, v] of Object.entries(root)) if (Array.isArray(v) && v.length) chips.push(`${fmtN(v.length)} ${v.length === 1 ? singular(k).toLowerCase() : humanize(k).toLowerCase()}`);
-  } else if (Array.isArray(root)) chips.push(`${fmtN(root.length)} items`);
-  if (media.length) chips.push(`${fmtN(media.length)}${media.length >= MEDIA_MAX ? '+' : ''} ${media.length === 1 ? 'image' : 'images'}`);
-  if (words) chips.push(`${fmtN(words)} words`);
-  return chips;
+    for (const [k, v] of Object.entries(root)) if (Array.isArray(v) && v.length) out.push([fmtN(v.length), v.length === 1 ? singular(k) : humanize(k)]);
+  } else if (Array.isArray(root)) out.push([fmtN(root.length), 'Items']);
+  if (media.length) out.push([`${fmtN(media.length)}${media.length >= MEDIA_MAX ? '+' : ''}`, media.length === 1 ? 'Image' : 'Images']);
+  if (words) out.push([fmtN(words), 'Words']);
+  return out.slice(0, 5);
 };
-
-// A gallery tile shaped like its image: a document page stands tall, a chart
-// lies wide, each on a neutral mat with its label underneath (not on top).
-const THUMB_H = 150;
-function Thumb({ m, onOpen }) {
-  const [dims, setDims] = useState(m.width && m.height ? { w: m.width, h: m.height } : null);
-  const ratio = dims ? dims.w / dims.h : 0.8;
-  const width = Math.round(Math.min(260, Math.max(112, THUMB_H * ratio)));
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(m.id)}
-      title={`${m.label} · ${formatBytes(m.bytes)}`}
-      style={{ width: width + 12 }}
-      className="group/th flex-shrink-0 snap-start p-1.5 rounded-[11px] border border-[#e8e6e3] bg-white text-left transition-colors hover:border-[#cfc8c1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)]"
-    >
-      <span className="flex items-center justify-center rounded-[7px] bg-[#f4f2f0] overflow-hidden" style={{ height: THUMB_H }}>
-        <img
-          src={m.src}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onLoad={e => { if (!dims) setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); }}
-          className="vv-checker vv-paper block max-w-[calc(100%-12px)] max-h-[calc(100%-12px)] rounded-[2px] transition-transform duration-200 group-hover/th:scale-[1.03]"
-        />
-      </span>
-      <span className="block mt-1.5 px-0.5 truncate text-[11.5px] font-medium text-[#4a423e]">{m.label}</span>
-      <span className="block px-0.5 truncate text-[10.5px] text-[#8a7f78] tabular-nums" title={formatBytes(m.bytes)}>
-        {dims ? `${dims.w} × ${dims.h}` : formatBytes(m.bytes)}
-      </span>
-    </button>
-  );
-}
 
 function Gallery({ media, onOpen }) {
   const [shown, setShown] = useState(24);
   return (
-    <div className="vv-card px-4 py-3">
-      <div className="flex items-center gap-2 mb-2.5">
-        <Images size={14} className="text-[var(--sig-ink)]" />
-        <span className="font-johnson-display font-bold text-[14px] text-[#312c2a]">Images</span>
-        <span className="text-[11.5px] text-[#8a7f78]">{fmtN(media.length)}</span>
+    <div className="vv-card px-5 py-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Images size={15} className="text-[var(--sig-ink)]" />
+        <span className="font-johnson-display font-bold text-[15px] text-[#211d1b]">Images</span>
+        <span className="text-[12px] tabular-nums text-[#a39992]">{fmtN(media.length)}</span>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1 snap-x">
-        {media.slice(0, shown).map(m => <Thumb key={m.id} m={m} onOpen={onOpen} />)}
+      <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+        {media.slice(0, shown).map(m => (
+          <div key={m.id} className="snap-start">
+            <MediaTile img={m} id={m.id} label={m.label} rec={{ width: m.width, height: m.height, bytes: m.bytes, name: m.name }} onOpen={onOpen} />
+          </div>
+        ))}
         {media.length > shown && (
-          <button type="button" onClick={() => setShown(s => s + 24)} className="flex-shrink-0 w-[120px] h-[204px] rounded-[10px] border border-dashed border-[#d5cfc9] text-[12px] font-medium text-[var(--sig-ink)] hover:bg-[#faf9f8]">
+          <button type="button" onClick={() => setShown(s => s + 24)} className="flex-shrink-0 self-start w-[128px] h-[168px] rounded-2xl border border-dashed border-[#d5cfc9] text-[12.5px] font-medium text-[var(--sig-ink)] hover:bg-[#faf9f8]">
             +{fmtN(media.length - shown)} more
           </button>
         )}
@@ -589,65 +623,65 @@ export function Preview({ value, openDepth = 4 }) {
   const onOpenImage = useCallback((id) => setLightbox(media.findIndex(m => m.id === id)), [media]);
   const closeLightbox = useCallback(() => setLightbox(-1), []);
   const ctx = useMemo(() => ({ onOpenImage, openDepth }), [onOpenImage, openDepth]);
-  const chips = useMemo(() => statsOf(value, media), [value, media]);
+  const stats = useMemo(() => statsOf(value, media), [value, media]);
   const isRecord = value && typeof value === 'object';
   return (
-    <div className="vv-in-soft mx-auto w-full max-w-[1040px] px-4 sm:px-6 py-5 space-y-4">
+    <div className="vv-in-soft mx-auto w-full max-w-[1080px] px-4 sm:px-8 py-6 space-y-5">
       <style>{PREVIEW_CSS}</style>
       {lightbox >= 0 && createPortal(<Lightbox items={media} index={lightbox} onIndex={setLightbox} onClose={closeLightbox} />, document.body)}
-      {chips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {chips.map(c => <span key={c} className="inline-flex items-center h-[24px] px-2.5 rounded-full bg-white border border-[#e8e6e3] text-[12px] text-[#4a423e] tabular-nums">{c}</span>)}
+      {stats.length > 0 && (
+        <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(130px,1fr))]">
+          {stats.map(([n, label]) => (
+            <div key={label} className="vv-card px-4 py-3">
+              <div className="font-johnson-display font-bold text-[22px] leading-none tabular-nums text-[#211d1b]">{n}</div>
+              <div className="mt-1.5 text-[11px] font-medium uppercase tracking-[.08em] text-[#8a7f78]">{label}</div>
+            </div>
+          ))}
         </div>
       )}
       {media.length > 1 && <Gallery media={media} onOpen={onOpenImage} />}
-      {isRecord && !Array.isArray(value) ? (
-        <TopFields obj={value} ctx={ctx} />
-      ) : (
-        <div className="vv-card p-4"><Node v={value} path={[]} depth={0} ctx={ctx} /></div>
+      {isRecord && !Array.isArray(value) ? <TopFields obj={value} ctx={ctx} /> : (
+        <div className="vv-card p-5"><Node v={value} path={[]} depth={0} ctx={ctx} /></div>
       )}
     </div>
   );
 }
 
-// The top level: its simple fields as one card, every bigger field as a card of its own.
+const CardTitle = ({ title, meta }) => (
+  <div className="mb-3 flex items-baseline gap-2">
+    <span className="font-johnson-display font-bold text-[15px] text-[#211d1b]">{title}</span>
+    {meta && <span className="text-[12px] tabular-nums text-[#a39992]">{meta}</span>}
+  </div>
+);
+
+// The top level: simple fields together in one card, each flat group in a
+// card of its own, lists of records as cards, the rest as titled cards.
 function TopFields({ obj, ctx }) {
   const entries = Object.entries(obj);
-  const inline = Object.fromEntries(entries.filter(([, v]) => isInline(v)));
-  const blocks = entries.filter(([, v]) => !isInline(v));
-  const groups = entries.filter(([, v]) => v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(isInline));
+  const inline = entries.filter(([, v]) => isInline(v));
+  const groups = entries.filter(([, v]) => v && typeof v === 'object' && !Array.isArray(v) && !isEmptyBox(v) && Object.values(v).every(isInline));
   const groupKeys = new Set(groups.map(([k]) => k));
+  const rest = entries.filter(([k, v]) => !isInline(v) && !groupKeys.has(k) && !isEmptyBox(v));
+  const cards = (inline.length ? 1 : 0) + groups.length;
   return (
     <>
-      {(Object.keys(inline).length > 0 || groups.length > 0) && (
-        <div className={`grid gap-4 ${(Object.keys(inline).length > 0 ? 1 : 0) + groups.length > 1 ? 'md:grid-cols-2' : ''}`}>
-          {Object.keys(inline).length > 0 && (
-            <div className="vv-card px-4 py-3">
-              <div className="mb-1 font-johnson-display font-bold text-[14px] text-[#312c2a]">Details</div>
-              <Fields obj={inline} path={[]} depth={0} ctx={ctx} />
-            </div>
-          )}
-          {groups.map(([k, v]) => (
-            <div key={k} className="vv-card px-4 py-3">
-              <div className="mb-1 flex items-baseline gap-2"><span className="font-johnson-display font-bold text-[14px] text-[#312c2a]">{humanize(k)}</span><span className="text-[11.5px] text-[#8a7f78]">{metaOf(v)}</span></div>
-              <Fields obj={v} path={[k]} depth={0} ctx={ctx} />
-            </div>
-          ))}
+      {cards > 0 && (
+        <div className={`grid gap-5 ${cards > 1 ? 'lg:grid-cols-2' : ''}`}>
+          {inline.length > 0 && <div className="vv-card p-5"><CardTitle title="Details" /><Specs entries={inline} /></div>}
+          {groups.map(([k, v]) => <div key={k} className="vv-card p-5"><CardTitle title={humanize(k)} /><Specs entries={Object.entries(v)} /></div>)}
         </div>
       )}
-      {blocks.filter(([k]) => !groupKeys.has(k)).map(([k, v]) => (
-        Array.isArray(v) && v.length && v.every(x => x && typeof x === 'object' && !Array.isArray(x)) && !tableColumns(v) ? (
+      {rest.map(([k, v]) => (
+        Array.isArray(v) && !isMediaList(v) && !tableColumns(v) && v.some(x => x && typeof x === 'object') ? (
           <div key={k}>
-            <div className="mb-2 mt-1 flex items-baseline gap-2 px-1">
-              <span className="font-johnson-display font-bold text-[15px] text-[#312c2a]">{humanize(k)}</span>
-              <span className="text-[11.5px] text-[#8a7f78]">{metaOf(v)}</span>
-            </div>
-            <Cards arr={v} k={k} path={[k]} depth={0} ctx={ctx} />
+            <div className="mt-2 mb-3 px-1"><CardTitle title={humanize(k)} meta={fmtN(v.length)} /></div>
+            <RecordCards arr={v} k={k} path={[k]} depth={0} ctx={ctx} />
           </div>
         ) : (
-          <Section key={k} title={humanize(k)} meta={metaOf(v)} depth={0} defaultOpen={ctx.openDepth > 0}>
+          <div key={k} className="vv-card p-5">
+            <CardTitle title={humanize(k)} meta={metaOf(v)} />
             <Node v={v} k={k} path={[k]} depth={0} ctx={ctx} />
-          </Section>
+          </div>
         )
       ))}
     </>
@@ -712,8 +746,8 @@ function Lightbox({ items, index, onIndex, onClose }) {
 // Styles the classes above use (vv-in-soft and vv-pop come with the viewer).
 // Plain CSS: transforms and opacity only.
 const PREVIEW_CSS = `
-.vv-card { background: #fff; border: 1px solid #e8e6e3; border-radius: 14px; box-shadow: 0 1px 2px rgba(49,44,42,.04); }
-.vv-cv { content-visibility: auto; contain-intrinsic-size: auto 240px; }
+.vv-card { background: #fff; border: 1px solid #ebe8e5; border-radius: 18px; box-shadow: 0 1px 2px rgba(33,29,27,.04), 0 4px 14px -8px rgba(33,29,27,.08); }
+.vv-cv { content-visibility: auto; contain-intrinsic-size: auto 72px; }
 .vv-paper { box-shadow: 0 1px 2px rgba(49,44,42,.10), 0 0 0 1px rgba(49,44,42,.06); }
 .vv-checker { background-color: #fff; background-image: linear-gradient(45deg,#f1efed 25%,transparent 25%),linear-gradient(-45deg,#f1efed 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f1efed 75%),linear-gradient(-45deg,transparent 75%,#f1efed 75%); background-size: 16px 16px; background-position: 0 0,0 8px,8px -8px,-8px 0; }
 .vv-fade { -webkit-mask-image: linear-gradient(180deg,#000 70%,transparent); mask-image: linear-gradient(180deg,#000 70%,transparent); }
