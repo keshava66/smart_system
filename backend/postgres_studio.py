@@ -1293,7 +1293,7 @@ def profile_data(body: ProfileRequest, conn_id: Optional[str] = Query(None), aut
                 raise HTTPException(status_code=409, detail="This result is not available any more. Run the query again.")
             names = [c["name"] for c in job["columns"]]
             types = {c["name"]: c.get("display_type") or c.get("type") or "" for c in job["columns"]}
-            cols, skipped = _profile_capped([(c["name"], profile_family(c.get("type"))) for c in job["columns"]])
+            cols, skipped = _profile_capped([(c["name"], profile_family(c.get("type"))) for c in job["columns"]], body.columns)
             if job["inline_rows"] is not None:
                 rows, _ = _paged_inline(job, RowsRequest(page=1, page_size=max(1, len(job["inline_rows"])), filters=body.filters))
                 out = profile_rows([[r[names.index(n)] for n, _ in cols] for r in rows], cols)
@@ -1310,7 +1310,7 @@ def profile_data(body: ProfileRequest, conn_id: Optional[str] = Query(None), aut
             table_cols = _fetch_columns(body.database, body.schema_, body.table, conn_id=cfg["conn_id"])
             names = [c["name"] for c in table_cols]
             types = {c["name"]: c.get("display_type") or c["data_type"] for c in table_cols}
-            cols, skipped = _profile_capped([(c["name"], profile_family(c["data_type"])) for c in table_cols])
+            cols, skipped = _profile_capped([(c["name"], profile_family(c["data_type"])) for c in table_cols], body.columns, body.table)
             where, params = build_where(body.filters, names)
             with _pooled(body.database, cfg["conn_id"]) as conn, conn.cursor() as cur:
                 out = run(cur, qualified(None, body.schema_, body.table), where, params, cols, cfg["statement_timeout_seconds"])

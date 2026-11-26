@@ -1751,28 +1751,28 @@ function StudioPane({ active: paneActive = true }) {
   /* --------------------------- grid interactions --------------------------- */
   const isData = active.kind === 'data';
 
-  // Profile past the page: every row of this result (with the grid's filters),
-  // and the whole table the result comes from, when it plainly reads one.
-  const profileScopes = [];
+  // A Profile card's "Whole table" button: that column over the table the
+  // result plainly reads (the data editor's own table, with its filters), or
+  // failing that, "All rows" of the result when it is bigger than the page.
+  let profileWide = null;
   {
-    const v = view;
-    const filters = v.filters || [];
-    const post = (body) => () => fetchJson(withQs(`${E.api}/profile`, cq), { method: 'POST', body });
-    if (!isData && v.jobId && v.status === 'success' && (v.rowCount == null || v.rowCount > (v.rows || []).length)) {
-      profileScopes.push({
-        id: 'result', label: v.rowCount != null ? `All ${fmtN(v.rowCount)} rows` : 'All rows', filtered: filters.length > 0,
-        key: `r|${v.jobId}|${JSON.stringify(filters)}`, load: post({ source: 'result', job_id: v.jobId, filters }),
-      });
-    }
+    const filters = view.filters || [];
+    const post = (body) => (columns) => fetchJson(withQs(`${E.api}/profile`, cq), { method: 'POST', body: { ...body, columns } });
     const t = isData ? active.table
-      : v.sql ? editTargetFor(v.sql, tabDb, E.pickDb ? serverInfo?.default_schema : tabSchema, E.upperIdents, true) : null;
+      : view.sql ? editTargetFor(view.sql, tabDb, E.pickDb ? serverInfo?.default_schema : tabSchema, E.upperIdents, true) : null;
     if (t && !t.error && t.table) {
       const tf = isData ? filters : [];
-      profileScopes.push({
-        id: 'table', label: isData ? 'Whole table' : `Whole table · ${t.table}`, name: t.table, filtered: tf.length > 0,
+      profileWide = {
+        label: 'Whole table', title: `This column over every row of ${t.table}${tf.length ? ', with the filters' : ''}`,
         key: `t|${E.id}|${cq}|${t.database}.${t.schema}.${t.table}|${JSON.stringify(tf)}`,
         load: post({ source: 'table', database: t.database, schema: t.schema, table: t.table, filters: tf }),
-      });
+      };
+    } else if (!isData && view.jobId && view.status === 'success' && (view.rowCount == null || view.rowCount > (view.rows || []).length)) {
+      profileWide = {
+        label: 'All rows', title: `This column over all ${view.rowCount != null ? fmtN(view.rowCount) : ''} rows of the result${filters.length ? ', with the filters' : ''}`,
+        key: `r|${view.jobId}|${JSON.stringify(filters)}`,
+        load: post({ source: 'result', job_id: view.jobId, filters }),
+      };
     }
   }
   const isCopier = active.kind === 'copier';
@@ -2762,7 +2762,7 @@ function StudioPane({ active: paneActive = true }) {
                     onCopy={obj => navigator.clipboard?.writeText(JSON.stringify(obj, null, 2)).then(() => toast('Row copied as JSON', 'success', 1500)).catch(() => {})}
                   />
                 ) : shownTab === 'profile' ? (
-                  <ProfileView columns={gridColumns} families={gridFamilies} rows={view.rows} total={view.rowCount} accent={E.accent} onChart={name => { setChartBy(name); setResultTab('chart'); }} scopes={profileScopes} />
+                  <ProfileView columns={gridColumns} families={gridFamilies} rows={view.rows} total={view.rowCount} accent={E.accent} onChart={name => { setChartBy(name); setResultTab('chart'); }} wide={profileWide} />
                 ) : shownTab === 'chart' ? (
                   <ChartView columns={gridColumns} families={gridFamilies} rows={view.rows} total={view.rowCount} accent={E.accent} groupBy={chartBy} onGroupBy={setChartBy} />
                 ) : (

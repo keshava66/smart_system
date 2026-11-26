@@ -688,3 +688,15 @@ def test_sf_profile_result_needs_a_live_result(monkeypatch):
     with pytest.raises(HTTPException) as e:
         S.profile_data(S.ProfileRequest(source="result", job_id="x"), auth={"user": {"email": "a@x.com"}})
     assert e.value.status_code == 409
+
+
+def test_profile_just_the_asked_columns():
+    import pytest
+    from fastapi import HTTPException
+    from snowflake_query_runner import _profile_capped
+    cols = [("A", "num"), ("B", "text"), ("C", "time")]
+    assert _profile_capped(cols, ["C"]) == ([("C", "time")], 0)
+    assert _profile_capped(cols) == (cols, 0)
+    with pytest.raises(HTTPException) as e:
+        _profile_capped(cols, ["Z"], "T")
+    assert e.value.status_code == 400 and "Z is not a column of T" in e.value.detail

@@ -2403,6 +2403,7 @@ class ProfileRequest(BaseModel):
     table: Optional[str] = None
     job_id: Optional[str] = None
     filters: Optional[List[ColumnFilter]] = None
+    columns: Optional[List[str]] = None      # just these columns (the Profile card's "Whole table" button)
 
     model_config = {"populate_by_name": True}
 
@@ -2410,7 +2411,14 @@ class ProfileRequest(BaseModel):
 _QUERY_ID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
-def _profile_capped(columns: List[tuple]):
+def _profile_capped(columns: List[tuple], wanted: Optional[List[str]] = None, what: str = "this result"):
+    if wanted:
+        have = {name for name, _ in columns}
+        missing = [w for w in wanted if w not in have]
+        if missing:
+            raise HTTPException(status_code=400, detail=f"{', '.join(missing)} is not a column of {what}")
+        keep = set(wanted)
+        columns = [c for c in columns if c[0] in keep]
     return columns[:PROFILE_MAX_COLUMNS], max(0, len(columns) - PROFILE_MAX_COLUMNS)
 
 
@@ -2429,7 +2437,7 @@ def profile_data(body: ProfileRequest, conn_id: Optional[str] = Query(None), rol
             raise HTTPException(status_code=409, detail="This result is not available any more. Run the query again.")
         names = [c["name"] for c in job["columns"]]
         types = {c["name"]: c.get("display_type") or c.get("type") or "" for c in job["columns"]}
-        cols, skipped = _profile_capped([(c["name"], profile_family(c.get("type"))) for c in job["columns"]])
+        cols, skipped = _profile_capped([(c["name"], profile_family(c.get("type"))) for c in job["columns"]], body.columns)
         if job["inline_rows"] is not None:
             rows, _ = _paged_inline(job, RowsRequest(page=1, page_size=max(1, len(job["inline_rows"])), filters=body.filters))
             out = profile_rows([[r[names.index(n)] for n, _ in cols] for r in rows], cols)
@@ -2450,7 +2458,7 @@ def profile_data(body: ProfileRequest, conn_id: Optional[str] = Query(None), rol
         table_cols = _fetch_columns(body.database, body.schema_, body.table, profile=profile)
         names = [c["name"] for c in table_cols]
         types = {c["name"]: c["data_type"] for c in table_cols}
-        cols, skipped = _profile_capped([(c["name"], profile_family(c["data_type"])) for c in table_cols])
+        cols, skipped = _profile_capped([(c["name"], profile_family(c["data_type"])) for c in table_cols], body.columns, body.table)
         source = qualified(body.database, body.schema_, body.table)
         database, schema = body.database, body.schema_
 

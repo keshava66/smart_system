@@ -1,14 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { ChevronLeft, ChevronRight, Copy, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, RefreshCw, X } from 'lucide-react';
 
 // Extra ways to look at a result: one row at a time, every column at a glance,
 // a quick chart and a pivot. They work on the rows already in the browser (the
-// page on screen) and say so. Profile can also ask the server to profile the
-// whole result or the whole table (POST /profile).
+// page on screen) and say so. A Profile card can also ask the server for its
+// column over the whole table or result (POST /profile).
 
 const isBig = (v) => Boolean(v && typeof v === 'object' && v.$truncated);
 const NF2 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
@@ -206,24 +206,52 @@ const fromServer = (c, total) => ({
   time: c.family === 'time' && c.min ? { min: c.min, max: c.max, counts: monthCounts(c.months) } : null,
 });
 
-function ProfileCard({ name, type, family, p, accent, onChart }) {
+// One column. By default the rows in the browser; its "Whole table" (or "All
+// rows") button asks the server for that column over every row, and the card
+// can switch back to the page.
+function ProfileCard({ name, type, family, pagep, accent, onChart, wide, got, onWide, onPage }) {
+  const showing = got?.show && got.data;
+  const p = showing ? fromServer(got.data.col, got.data.rows) : pagep;
+  const fam = showing ? got.data.col.family : family;
   const emptyPct = p.total ? Math.round(p.empty / p.total * 100) : 0;
   const unique = p.distinct != null && p.distinct === p.filled && p.filled > 1;
-  const flag = p.filled === 0 ? null : emptyPct >= 5 ? `${emptyPct}% of rows are empty` : p.distinct === 1 ? 'Only one value' : unique && family === 'text' ? 'Every value is different' : null;
-  const chartable = onChart && (family === 'time' || (family !== 'num' && !unique)) && p.distinct > 1;
+  const flag = p.filled === 0 ? null : emptyPct >= 5 ? `${emptyPct}% of rows are empty` : p.distinct === 1 ? 'Only one value' : unique && fam === 'text' ? 'Every value is different' : null;
+  const chartable = onChart && !showing && (fam === 'time' || (fam !== 'num' && !unique)) && p.distinct > 1;
   const range = p.num ? `${fmt(p.num.min)} to ${fmt(p.num.max)}`
     : p.time ? `${String(p.time.min).slice(0, 10)} to ${String(p.time.max).slice(0, 10)}`
       : p.top[0] ? (unique ? `e.g. ${p.top[0][0]}` : `Most: ${p.top[0][0]}`) : p.filled ? '' : 'All empty';
+  const loading = got?.loading;
+  const link = 'inline-flex items-center gap-1 rounded text-[11.5px] font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)]';
   return (
-    <button
-      type="button"
+    <div
       onClick={() => chartable && onChart(name)}
       title={chartable ? `Chart rows by ${name}` : undefined}
-      className={`flex flex-col justify-start text-left px-3.5 py-3 rounded-xl border border-[#e8e6e3] transition-shadow ${chartable ? 'hover:border-[#a39992] hover:shadow-[0_6px_20px_rgba(49,44,42,.06)]' : 'cursor-default'}`}
+      className={`flex flex-col justify-start text-left px-3.5 py-3 rounded-xl border transition-shadow ${showing ? 'border-[var(--sig-mid)] bg-[#fbfaf9]' : 'border-[#e8e6e3]'} ${chartable ? 'cursor-pointer hover:border-[#a39992] hover:shadow-[0_6px_20px_rgba(49,44,42,.06)]' : ''}`}
     >
-      <div className="font-bold text-[13px] text-[#312c2a] truncate">{name}</div>
-      <div className="text-[11.5px] text-[#766a63]">{type}</div>
-      <div className="mt-2.5">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="font-bold text-[13px] text-[#312c2a] truncate">{name}</div>
+          <div className="text-[11.5px] text-[#766a63]">{type}</div>
+        </div>
+        {wide && (
+          showing ? (
+            <button type="button" onClick={e => { e.stopPropagation(); onPage(name); }} className={`${link} flex-shrink-0 h-[22px] px-2 rounded-full bg-[var(--sig-soft)] text-[var(--sig-ink)]`} title="Back to the rows on this page">
+              {wide.label} · {fmt(got.data.rows)}<X size={11} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={e => { e.stopPropagation(); onWide(name); }}
+              title={wide.title}
+              className={`${link} flex-shrink-0 h-[22px] px-2 rounded-full border border-[#e0dbd6] bg-white text-[#4a423e] hover:border-[#a39992] hover:text-[#312c2a] disabled:opacity-70`}
+            >
+              {loading ? <><RefreshCw size={11} className="animate-spin" />Working…</> : wide.label}
+            </button>
+          )
+        )}
+      </div>
+      <div className={`mt-2.5 ${loading ? 'opacity-50' : ''}`}>
         {p.num ? <Bins values={p.num.values} counts={p.num.counts} accent={accent} />
           : p.time ? <Bins values={p.time.months} counts={p.time.counts} accent={accent} />
             : <div className="h-9 flex items-end"><Shares top={p.top} total={p.total || 1} accent={accent} /></div>}
@@ -233,76 +261,50 @@ function ProfileCard({ name, type, family, p, accent, onChart }) {
         <span className="truncate" title={range}>{range}</span>
       </div>
       {flag && <div className="mt-1.5 text-[11.5px] text-[#a14a00]">{flag}</div>}
-    </button>
+      {got?.error && <div className="mt-1.5 text-[11.5px] text-[#9e0000]">{got.error}</div>}
+    </div>
   );
 }
 
-// scopes: [{ id: 'page' }, { id, label, key, load }]. "page" is the rows in
-// the browser; the others are fetched with load() and kept by key, so going
-// back and forth between them doesn't ask the server twice.
-export function ProfileView({ columns, families, rows, total, accent, onChart, scopes = [] }) {
-  const [scopeId, setScopeId] = useState('page');
-  const [got, setGot] = useState({});           // key -> { loading } | { data } | { error }
-  const scope = scopes.find(x => x.id === scopeId) || null;
-  const server = scope && scope.id !== 'page' ? scope : null;
-  const entry = server ? got[server.key] : null;
-
-  const fetchScope = (sc) => {
-    setGot(g => ({ ...g, [sc.key]: { loading: true } }));
-    sc.load()
-      .then(data => setGot(g => ({ ...g, [sc.key]: { data } })))
-      .catch(err => setGot(g => ({ ...g, [sc.key]: { error: err.message || 'Could not profile this' } })));
-  };
-  useEffect(() => {
-    if (server && !got[server.key]) fetchScope(server);
-    // fetch once per scope key; fetchScope only closes over setters
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [server?.key]);
-
+// wide: { label, title, key, load(columns) } when the server can profile past
+// the page (the whole table, or every row of the result), else null. Answers
+// are kept per column and per wide.key, so a card toggles back and forth for free.
+export function ProfileView({ columns, families, rows, total, accent, onChart, wide = null }) {
+  const [got, setGot] = useState({});           // `${key}|${column}` -> { loading } | { data, show } | { error }
   const pageProfiles = useMemo(() => columns.map((c, i) => profileColumn(rows, i, families[i])), [columns, rows, families]);
-  const options = [['page', `This page · ${fmt(rows.length)}`], ...scopes.filter(x => x.id !== 'page').map(x => [x.id, x.label])];
+  const id = (name) => `${wide?.key}|${name}`;
+  const patch = (name, v) => setGot(g => ({ ...g, [id(name)]: { ...g[id(name)], ...v } }));
 
-  let body;
-  if (!server) {
-    body = columns.map((c, i) => <ProfileCard key={c.name} name={c.name} type={c.type} family={families[i]} p={pageProfiles[i]} accent={accent} onChart={onChart} />);
-  } else if (!entry || entry.loading) {
-    body = (server.columns || columns).map(c => (
-      <div key={c.name} className="px-3.5 py-3 rounded-xl border border-[#e8e6e3]" aria-hidden="true">
-        <div className="font-bold text-[13px] text-[#312c2a] truncate">{c.name}</div>
-        <div className="mt-3 h-9 rounded-md bg-[#f1efed] animate-pulse" />
-        <div className="mt-2 h-3 w-2/3 rounded bg-[#f1efed] animate-pulse" />
-      </div>
-    ));
-  } else if (entry.error) {
-    body = null;
-  } else {
-    const d = entry.data;
-    const inGrid = new Set(columns.map(c => c.name));
-    body = d.columns.map(c => (
-      <ProfileCard key={c.name} name={c.name} type={c.type} family={c.family} p={fromServer(c, d.rows)} accent={accent} onChart={inGrid.has(c.name) ? onChart : null} />
-    ));
-  }
+  const onWide = (name) => {
+    const k = id(name);
+    if (got[k]?.data) { patch(name, { show: true }); return; }
+    setGot(g => ({ ...g, [k]: { loading: true } }));
+    wide.load([name])
+      .then(d => setGot(g => ({ ...g, [k]: { data: { rows: d.rows, elapsed: d.elapsed_ms, col: d.columns[0] }, show: true } })))
+      .catch(err => setGot(g => ({ ...g, [k]: { error: err.message || 'Could not profile this column' } })));
+  };
+  const onPage = (name) => patch(name, { show: false });
 
   return (
     <div className="px-5 py-4">
-      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        {options.length > 1 && <Segmented value={server ? server.id : 'page'} onChange={setScopeId} options={options} />}
-        {!server && <Note rows={rows.length} total={total} />}
-        {server && entry?.data && (
-          <span className="text-[11.5px] text-[#766a63] tabular-nums">
-            {server.id === 'table' ? `Every row of ${server.name}` : 'Every row of the result'}{server.filtered ? ', with the filters' : ''}: {fmt(entry.data.rows)} rows, worked out in {fmt(entry.data.elapsed_ms / 1000)} s
-            {entry.data.columns_skipped > 0 && ` · the first ${fmt(entry.data.columns.length)} columns`}
-          </span>
-        )}
-        {server && entry?.loading && <span className="text-[11.5px] text-[#766a63]">Profiling every row{server.id === 'table' ? ` of ${server.name}` : ''}…</span>}
-        {server && entry && !entry.loading && (
-          <button type="button" onClick={() => fetchScope(server)} className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[var(--sig-ink)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] rounded">
-            <RefreshCw size={11} />{entry.error ? 'Try again' : 'Refresh'}
-          </button>
-        )}
+      <div className="mb-3"><Note rows={rows.length} total={total} /></div>
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
+        {columns.map((c, i) => (
+          <ProfileCard
+            key={c.name}
+            name={c.name}
+            type={c.type}
+            family={families[i]}
+            pagep={pageProfiles[i]}
+            accent={accent}
+            onChart={onChart}
+            wide={wide}
+            got={wide ? got[id(c.name)] : null}
+            onWide={onWide}
+            onPage={onPage}
+          />
+        ))}
       </div>
-      {entry?.error && <div className="mb-3 rounded-lg bg-[#fdf3f1] px-3 py-2 text-[12.5px] text-[#9e0000]">{entry.error}</div>}
-      {body && <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>{body}</div>}
     </div>
   );
 }
