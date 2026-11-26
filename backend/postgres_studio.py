@@ -27,6 +27,7 @@ import postgres_query_runner as pgqr
 import shared_worksheets
 from auth import require_permission
 from snowflake_query_runner import (
+    ProfileRequest, _profile_capped,
     EXPORT_FORMATS, ROWS_PAGE_MAX_SIZE,
     CELL_MAX_CHARS, CELL_PREVIEW_CHARS, CellRequest, full_cell, MutateRequest, RowsRequest, SavedQueryRequest, TableRowsRequest, grid_rows,
     _DuplicateRow, _MutationMismatch, numbered_sections, _cache_drop_prefix, _cache_get, _cache_set,
@@ -34,6 +35,7 @@ from snowflake_query_runner import (
     _stream_rows,
 )
 from snowflake_sql import (
+    profile_dist_sql, profile_family, profile_finish, profile_rows, profile_stats, profile_stats_sql,
     ALL_OPS, SET_OPS, TEXT_OPS, ColumnFilter, _statement_result, build_order_by, confirm_detail, failed_at, plan_statements,
     qualified, quote_ident,
 )
@@ -1257,6 +1259,68 @@ def get_query_values(job_id: str, body: ValuesRequest, auth: dict = Depends(requ
             # json has no equality, so it can't be grouped: say so instead of a 500.
             raise HTTPException(status_code=400, detail=f"Can't count the values of {body.column}: {str(e).strip().splitlines()[0]}")
     return {"column": body.column, "values": [{"value": _safe(v), "count": int(n)} for v, n in rows[:body.limit]], "more": len(rows) > body.limit}
+
+
+@pg_studio_router.post("/profile")
+def profile_data(body: ProfileRequest, conn_id: Optional[str] = Query(None), auth: dict = Depends(require_permission(PERM))):
+    """Counts, ranges, distinct values and distributions for every column of a
+    whole table or result, worked out by Postgres rather than the browser."""
+    started = time.time()
+
+    def run(cur, source, where, params, cols, timeout):
+        # Capped like a query, then put back: the session may be a worksheet's own.
+        cur.execute("SELECT set_config('statement_timeout', %s, false)", (str(int(timeout) * 1000),))
+        try:
+            cur.execute(_ps(profile_stats_sql(source, where, cols, "postgres")), tuple(params))
+            stats = profile_stats(cur.fetchone(), cols)
+            dist = profile_dist_sql(source, where, stats, "postgres")
+            rows = []
+            if dist:
+                sql, branches = dist
+                cur.execute(_ps(sql), tuple(params) * branches)
+                rows = cur.fetchall()
+            return profile_finish(stats, rows)
+        finally:
+            cur.execute("RESET statement_timeout")
+
+    what = "result" if body.source == "result" else "table"
+    try:
+        if body.source == "result":
+            if not body.job_id:
+                raise HTTPException(status_code=400, detail="job_id is required")
+            job = _get_job(body.job_id, auth["user"]["email"], shared=True)
+            if job["status"] != "success" or not job["returns_rows"]:
+                raise HTTPException(status_code=409, detail="This result is not available any more. Run the query again.")
+            names = [c["name"] for c in job["columns"]]
+            types = {c["name"]: c.get("display_type") or c.get("type") or "" for c in job["columns"]}
+            cols, skipped = _profile_capped([(c["name"], profile_family(c.get("type"))) for c in job["columns"]])
+            if job["inline_rows"] is not None:
+                rows, _ = _paged_inline(job, RowsRequest(page=1, page_size=max(1, len(job["inline_rows"])), filters=body.filters))
+                out = profile_rows([[r[names.index(n)] for n, _ in cols] for r in rows], cols)
+            else:
+                where, params = build_where(body.filters, names)
+                timeout = _cfg(job["session"]["conn_id"])["statement_timeout_seconds"]
+                with job["session"]["lock"]:
+                    with _result_conn(job).cursor() as cur:
+                        out = run(cur, quote_ident(job["temp_table"]), where, params, cols, timeout)
+        else:
+            if not (body.database and body.schema_ and body.table):
+                raise HTTPException(status_code=400, detail="database, schema and table are required")
+            cfg = _cfg(conn_id)
+            table_cols = _fetch_columns(body.database, body.schema_, body.table, conn_id=cfg["conn_id"])
+            names = [c["name"] for c in table_cols]
+            types = {c["name"]: c.get("display_type") or c["data_type"] for c in table_cols}
+            cols, skipped = _profile_capped([(c["name"], profile_family(c["data_type"])) for c in table_cols])
+            where, params = build_where(body.filters, names)
+            with _pooled(body.database, cfg["conn_id"]) as conn, conn.cursor() as cur:
+                out = run(cur, qualified(None, body.schema_, body.table), where, params, cols, cfg["statement_timeout_seconds"])
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not profile this {what}: {e}")
+    for c in out["columns"]:
+        c["type"] = types.get(c["name"], "")
+    return {**out, "source": body.source, "columns_skipped": skipped, "elapsed_ms": int((time.time() - started) * 1000)}
 
 
 @pg_studio_router.post("/query/{job_id}/cell")

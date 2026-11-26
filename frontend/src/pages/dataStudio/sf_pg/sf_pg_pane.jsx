@@ -106,7 +106,11 @@ const FROM_ONE = new RegExp(`\\bFROM\\s+(${IDENT}(?:\\s*\\.\\s*${IDENT}){0,2})`,
 
 const NOT_EDITABLE = /\b(JOIN|GROUP\s+BY|UNION|INTERSECT|EXCEPT|MINUS|DISTINCT|HAVING|PIVOT|UNPIVOT|LATERAL|FLATTEN|CONNECT\s+BY|MATCH_RECOGNIZE|QUALIFY|RESULT_SCAN)\b/i;
 
-function editTargetFor(sql, defaultDb, defaultSchema, upperIdents = true) {
+// Profile's "Whole table" only needs to know which one table a SELECT reads,
+// so grouping, DISTINCT and the like are fine; joins and set operations aren't.
+const NOT_ONE_TABLE = /\b(JOIN|UNION|INTERSECT|EXCEPT|MINUS|LATERAL|FLATTEN|RESULT_SCAN)\b/i;
+
+function editTargetFor(sql, defaultDb, defaultSchema, upperIdents = true, anyShape = false) {
   const clean = String(sql || '')
     .replace(/'(?:[^']|'')*'/g, "''")
     .replace(/--[^\n]*/g, ' ')
@@ -115,7 +119,7 @@ function editTargetFor(sql, defaultDb, defaultSchema, upperIdents = true) {
     .replace(/;\s*$/, '');
   if (!/^SELECT\b/i.test(clean)) return { error: 'Only the result of a SELECT can be edited.' };
   if ((clean.match(/\bSELECT\b/gi) || []).length > 1) return { error: 'Results with subqueries or CTEs can\'t be edited. Select from the table directly.' };
-  const bad = NOT_EDITABLE.exec(clean);
+  const bad = (anyShape ? NOT_ONE_TABLE : NOT_EDITABLE).exec(clean);
   if (bad) return { error: `Results that use ${bad[1].toUpperCase().replace(/\s+/g, ' ')} can't be edited, because rows no longer map one to one onto the table.` };
   const froms = [...clean.matchAll(FROM_ONE)];
   if (froms.length !== 1) return { error: 'Only results from a single table can be edited.' };
@@ -1746,6 +1750,31 @@ function StudioPane({ active: paneActive = true }) {
 
   /* --------------------------- grid interactions --------------------------- */
   const isData = active.kind === 'data';
+
+  // Profile past the page: every row of this result (with the grid's filters),
+  // and the whole table the result comes from, when it plainly reads one.
+  const profileScopes = [];
+  {
+    const v = view;
+    const filters = v.filters || [];
+    const post = (body) => () => fetchJson(withQs(`${E.api}/profile`, cq), { method: 'POST', body });
+    if (!isData && v.jobId && v.status === 'success' && (v.rowCount == null || v.rowCount > (v.rows || []).length)) {
+      profileScopes.push({
+        id: 'result', label: v.rowCount != null ? `All ${fmtN(v.rowCount)} rows` : 'All rows', filtered: filters.length > 0,
+        key: `r|${v.jobId}|${JSON.stringify(filters)}`, load: post({ source: 'result', job_id: v.jobId, filters }),
+      });
+    }
+    const t = isData ? active.table
+      : v.sql ? editTargetFor(v.sql, tabDb, E.pickDb ? serverInfo?.default_schema : tabSchema, E.upperIdents, true) : null;
+    if (t && !t.error && t.table) {
+      const tf = isData ? filters : [];
+      profileScopes.push({
+        id: 'table', label: isData ? 'Whole table' : `Whole table · ${t.table}`, name: t.table, filtered: tf.length > 0,
+        key: `t|${E.id}|${cq}|${t.database}.${t.schema}.${t.table}|${JSON.stringify(tf)}`,
+        load: post({ source: 'table', database: t.database, schema: t.schema, table: t.table, filters: tf }),
+      });
+    }
+  }
   const isCopier = active.kind === 'copier';
   const editingResult = !isData && !!view.editTarget;
   const editing = isData || editingResult;
@@ -2733,7 +2762,7 @@ function StudioPane({ active: paneActive = true }) {
                     onCopy={obj => navigator.clipboard?.writeText(JSON.stringify(obj, null, 2)).then(() => toast('Row copied as JSON', 'success', 1500)).catch(() => {})}
                   />
                 ) : shownTab === 'profile' ? (
-                  <ProfileView columns={gridColumns} families={gridFamilies} rows={view.rows} total={view.rowCount} accent={E.accent} onChart={name => { setChartBy(name); setResultTab('chart'); }} />
+                  <ProfileView columns={gridColumns} families={gridFamilies} rows={view.rows} total={view.rowCount} accent={E.accent} onChart={name => { setChartBy(name); setResultTab('chart'); }} scopes={profileScopes} />
                 ) : shownTab === 'chart' ? (
                   <ChartView columns={gridColumns} families={gridFamilies} rows={view.rows} total={view.rowCount} accent={E.accent} groupBy={chartBy} onGroupBy={setChartBy} />
                 ) : (

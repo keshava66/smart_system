@@ -1,13 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { ChevronLeft, ChevronRight, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, RefreshCw } from 'lucide-react';
 
 // Extra ways to look at a result: one row at a time, every column at a glance,
 // a quick chart and a pivot. They work on the rows already in the browser (the
-// page on screen), never the whole result, and each one says so.
+// page on screen) and say so. Profile can also ask the server to profile the
+// whole result or the whole table (POST /profile).
 
 const isBig = (v) => Boolean(v && typeof v === 'object' && v.$truncated);
 const NF2 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
@@ -98,11 +99,17 @@ function profileColumn(rows, i, family) {
   return out;
 }
 
-function Bins({ values, accent, bins = 18, height = 36 }) {
-  if (!values?.length) return <div style={{ height }} />;
-  const lo = values[0], hi = values[values.length - 1], b = Array(bins).fill(0);
-  values.forEach(v => { b[Math.min(bins - 1, Math.floor((v - lo) / ((hi - lo) || 1) * bins))]++; });
-  const mx = Math.max(...b);
+// Bars for sorted values, or for counts already binned (by the server).
+function Bins({ values, counts, accent, bins = 18, height = 36 }) {
+  let b = counts;
+  if (!b) {
+    if (!values?.length) return <div style={{ height }} />;
+    const lo = values[0], hi = values[values.length - 1];
+    b = Array(bins).fill(0);
+    values.forEach(v => { b[Math.min(bins - 1, Math.floor((v - lo) / ((hi - lo) || 1) * bins))]++; });
+  }
+  if (!b.length) return <div style={{ height }} />;
+  const mx = Math.max(1, ...b);
   return (
     <div className="flex items-end gap-[2px]" style={{ height }} aria-hidden="true">
       {b.map((n, k) => <span key={k} className="flex-1 rounded-t-[2px]" style={{ height: `${Math.max(4, n / mx * 100)}%`, background: accent, opacity: n ? 0.75 : 0.15 }} />)}
@@ -176,38 +183,126 @@ export function RecordView({ columns, families, rows, rowOffset = 0, index, onIn
 
 /* ------------------------------- profile ------------------------------ */
 
-export function ProfileView({ columns, families, rows, total, accent, onChart }) {
-  const profiles = useMemo(() => columns.map((c, i) => profileColumn(rows, i, families[i])), [columns, rows, families]);
+// Month counts from the server, gaps between them filled with zeros so the
+// bars keep their spacing in time (up to 20 years of months).
+const monthCounts = (months) => {
+  if (!months?.length) return [];
+  const idx = (k) => +k.slice(0, 4) * 12 + +k.slice(5, 7);
+  const first = idx(months[0][0]), last = idx(months[months.length - 1][0]);
+  if (!(last >= first) || last - first > 240) return months.map(([, n]) => n);
+  const out = Array(last - first + 1).fill(0);
+  months.forEach(([k, n]) => { out[idx(k) - first] += n; });
+  return out;
+};
+
+// One column of a server profile in the shape the cards draw.
+const fromServer = (c, total) => ({
+  total,
+  filled: c.filled,
+  empty: total - c.filled,
+  distinct: c.distinct,
+  top: c.top || [],
+  num: c.family === 'num' && c.min != null ? { min: c.min, max: c.max, avg: c.avg, counts: c.bins } : null,
+  time: c.family === 'time' && c.min ? { min: c.min, max: c.max, counts: monthCounts(c.months) } : null,
+});
+
+function ProfileCard({ name, type, family, p, accent, onChart }) {
+  const emptyPct = p.total ? Math.round(p.empty / p.total * 100) : 0;
+  const unique = p.distinct != null && p.distinct === p.filled && p.filled > 1;
+  const flag = p.filled === 0 ? null : emptyPct >= 5 ? `${emptyPct}% of rows are empty` : p.distinct === 1 ? 'Only one value' : unique && family === 'text' ? 'Every value is different' : null;
+  const chartable = onChart && (family === 'time' || (family !== 'num' && !unique)) && p.distinct > 1;
+  const range = p.num ? `${fmt(p.num.min)} to ${fmt(p.num.max)}`
+    : p.time ? `${String(p.time.min).slice(0, 10)} to ${String(p.time.max).slice(0, 10)}`
+      : p.top[0] ? (unique ? `e.g. ${p.top[0][0]}` : `Most: ${p.top[0][0]}`) : p.filled ? '' : 'All empty';
+  return (
+    <button
+      type="button"
+      onClick={() => chartable && onChart(name)}
+      title={chartable ? `Chart rows by ${name}` : undefined}
+      className={`flex flex-col justify-start text-left px-3.5 py-3 rounded-xl border border-[#e8e6e3] transition-shadow ${chartable ? 'hover:border-[#a39992] hover:shadow-[0_6px_20px_rgba(49,44,42,.06)]' : 'cursor-default'}`}
+    >
+      <div className="font-bold text-[13px] text-[#312c2a] truncate">{name}</div>
+      <div className="text-[11.5px] text-[#766a63]">{type}</div>
+      <div className="mt-2.5">
+        {p.num ? <Bins values={p.num.values} counts={p.num.counts} accent={accent} />
+          : p.time ? <Bins values={p.time.months} counts={p.time.counts} accent={accent} />
+            : <div className="h-9 flex items-end"><Shares top={p.top} total={p.total || 1} accent={accent} /></div>}
+      </div>
+      <div className="flex justify-between gap-2 mt-2 text-[11.5px] text-[#6e6259] tabular-nums">
+        <span className="flex-shrink-0 whitespace-nowrap">{p.distinct == null ? `${fmt(p.filled)} filled` : `${fmt(p.distinct)} distinct`}</span>
+        <span className="truncate" title={range}>{range}</span>
+      </div>
+      {flag && <div className="mt-1.5 text-[11.5px] text-[#a14a00]">{flag}</div>}
+    </button>
+  );
+}
+
+// scopes: [{ id: 'page' }, { id, label, key, load }]. "page" is the rows in
+// the browser; the others are fetched with load() and kept by key, so going
+// back and forth between them doesn't ask the server twice.
+export function ProfileView({ columns, families, rows, total, accent, onChart, scopes = [] }) {
+  const [scopeId, setScopeId] = useState('page');
+  const [got, setGot] = useState({});           // key -> { loading } | { data } | { error }
+  const scope = scopes.find(x => x.id === scopeId) || null;
+  const server = scope && scope.id !== 'page' ? scope : null;
+  const entry = server ? got[server.key] : null;
+
+  const fetchScope = (sc) => {
+    setGot(g => ({ ...g, [sc.key]: { loading: true } }));
+    sc.load()
+      .then(data => setGot(g => ({ ...g, [sc.key]: { data } })))
+      .catch(err => setGot(g => ({ ...g, [sc.key]: { error: err.message || 'Could not profile this' } })));
+  };
+  useEffect(() => {
+    if (server && !got[server.key]) fetchScope(server);
+    // fetch once per scope key; fetchScope only closes over setters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [server?.key]);
+
+  const pageProfiles = useMemo(() => columns.map((c, i) => profileColumn(rows, i, families[i])), [columns, rows, families]);
+  const options = [['page', `This page · ${fmt(rows.length)}`], ...scopes.filter(x => x.id !== 'page').map(x => [x.id, x.label])];
+
+  let body;
+  if (!server) {
+    body = columns.map((c, i) => <ProfileCard key={c.name} name={c.name} type={c.type} family={families[i]} p={pageProfiles[i]} accent={accent} onChart={onChart} />);
+  } else if (!entry || entry.loading) {
+    body = (server.columns || columns).map(c => (
+      <div key={c.name} className="px-3.5 py-3 rounded-xl border border-[#e8e6e3]" aria-hidden="true">
+        <div className="font-bold text-[13px] text-[#312c2a] truncate">{c.name}</div>
+        <div className="mt-3 h-9 rounded-md bg-[#f1efed] animate-pulse" />
+        <div className="mt-2 h-3 w-2/3 rounded bg-[#f1efed] animate-pulse" />
+      </div>
+    ));
+  } else if (entry.error) {
+    body = null;
+  } else {
+    const d = entry.data;
+    const inGrid = new Set(columns.map(c => c.name));
+    body = d.columns.map(c => (
+      <ProfileCard key={c.name} name={c.name} type={c.type} family={c.family} p={fromServer(c, d.rows)} accent={accent} onChart={inGrid.has(c.name) ? onChart : null} />
+    ));
+  }
+
   return (
     <div className="px-5 py-4">
-      <div className="mb-3"><Note rows={rows.length} total={total} /></div>
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
-        {columns.map((c, i) => {
-          const p = profiles[i], emptyPct = p.total ? Math.round(p.empty / p.total * 100) : 0;
-          const unique = p.distinct === p.filled && p.filled > 1;
-          const flag = emptyPct >= 5 ? `${emptyPct}% of rows are empty` : p.distinct === 1 ? 'Only one value' : unique && families[i] === 'text' ? 'Every value is different' : null;
-          const chartable = (families[i] === 'time' || (families[i] !== 'num' && !unique)) && p.distinct > 1;
-          return (
-            <button
-              key={c.name}
-              onClick={() => chartable && onChart(c.name)}
-              title={chartable ? `Chart rows by ${c.name}` : undefined}
-              className={`flex flex-col justify-start text-left px-3.5 py-3 rounded-xl border border-[#e8e6e3] transition-shadow ${chartable ? 'hover:border-[#a39992] hover:shadow-[0_6px_20px_rgba(49,44,42,.06)]' : 'cursor-default'}`}
-            >
-              <div className="font-bold text-[13px] text-[#312c2a] truncate">{c.name}</div>
-              <div className="text-[11.5px] text-[#766a63]">{c.type}</div>
-              <div className="mt-2.5">
-                {p.num ? <Bins values={p.num.values} accent={accent} /> : p.time ? <Bins values={p.time.months} accent={accent} /> : <div className="h-9 flex items-end"><Shares top={p.top} total={p.total || 1} accent={accent} /></div>}
-              </div>
-              <div className="flex justify-between gap-2 mt-2 text-[11.5px] text-[#6e6259] tabular-nums">
-                <span className="flex-shrink-0 whitespace-nowrap">{fmt(p.distinct)} distinct</span>
-                <span className="truncate">{p.num ? `${fmt(p.num.min)} to ${fmt(p.num.max)}` : p.time ? `${p.time.min.slice(0, 10)} to ${p.time.max.slice(0, 10)}` : p.top[0] ? (unique ? `e.g. ${p.top[0][0]}` : `Most: ${p.top[0][0]}`) : 'All empty'}</span>
-              </div>
-              {flag && <div className="mt-1.5 text-[11.5px] text-[#a14a00]">{flag}</div>}
-            </button>
-          );
-        })}
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        {options.length > 1 && <Segmented value={server ? server.id : 'page'} onChange={setScopeId} options={options} />}
+        {!server && <Note rows={rows.length} total={total} />}
+        {server && entry?.data && (
+          <span className="text-[11.5px] text-[#766a63] tabular-nums">
+            {server.id === 'table' ? `Every row of ${server.name}` : 'Every row of the result'}{server.filtered ? ', with the filters' : ''}: {fmt(entry.data.rows)} rows, worked out in {fmt(entry.data.elapsed_ms / 1000)} s
+            {entry.data.columns_skipped > 0 && ` · the first ${fmt(entry.data.columns.length)} columns`}
+          </span>
+        )}
+        {server && entry?.loading && <span className="text-[11.5px] text-[#766a63]">Profiling every row{server.id === 'table' ? ` of ${server.name}` : ''}…</span>}
+        {server && entry && !entry.loading && (
+          <button type="button" onClick={() => fetchScope(server)} className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[var(--sig-ink)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sig-ring)] rounded">
+            <RefreshCw size={11} />{entry.error ? 'Try again' : 'Refresh'}
+          </button>
+        )}
       </div>
+      {entry?.error && <div className="mb-3 rounded-lg bg-[#fdf3f1] px-3 py-2 text-[12.5px] text-[#9e0000]">{entry.error}</div>}
+      {body && <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>{body}</div>}
     </div>
   );
 }

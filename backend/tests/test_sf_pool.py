@@ -606,3 +606,85 @@ def test_pg_catalog_changed_drops_explorer_and_search_lists(monkeypatch):
         S._cache_set(key, ["old"])
     P.catalog_changed()
     assert [k for k in S._cache] == ["sf-roles:read"]
+
+
+def test_profile_sql_and_python_agree_on_shape():
+    """Data Studio's whole-table / whole-result Profile: the SQL is built per
+    column family, and a result held in memory is profiled the same way."""
+    from snowflake_sql import (profile_dist_sql, profile_family, profile_finish, profile_rows,
+                               profile_stats, profile_stats_sql)
+    assert [profile_family(t) for t in ("NUMBER(38,0)", "TIMESTAMP_NTZ", "TIME", "jsonb", "text", "integer[]", "BYTEA", "boolean")] == \
+        ["num", "time", "text", "json", "text", "vec", "bin", "bool"]
+    cols = [("id", "num"), ("made", "time"), ("name", "text"), ("blob", "bin")]
+    sql = profile_stats_sql('"S"."T"', " WHERE x = ?", cols, "postgres")
+    assert sql.startswith("SELECT COUNT(*), COUNT(\"id\") AS f0") and sql.endswith('FROM "S"."T" WHERE x = ?')
+    assert 'md5(CAST("name" AS TEXT))' in sql and "NULL AS d3" in sql
+    assert "HASH(\"name\")" in profile_stats_sql("t", "", cols, "snowflake")
+
+    stats = profile_stats([10, 10, 10, 1, 9, 5.5, 10, 4, "2025-01-02", "2025-03-01", None, 9, 2, None, None, None, 3, None, None, None, None], cols)
+    assert stats["rows"] == 10 and stats["columns"][0] == {"name": "id", "family": "num", "filled": 10, "distinct": 10, "min": 1.0, "max": 9.0, "avg": 5.5}
+    sql, branches = profile_dist_sql("t", " WHERE x = ?", stats, "postgres")
+    assert branches == 3 and sql.count("x = ?") == 3              # the blob column has no distribution
+    assert "TO_CHAR(\"made\", 'YYYY-MM')" in sql and "LIMIT 6" in sql
+    out = profile_finish(stats, [(0, "0", 4), (0, "17", 6), (1, "2025-01", 3), (1, "2025-03", 1), (2, "a", 7), (2, "b", 2)])
+    assert out["columns"][0]["bins"][0] == 4 and out["columns"][0]["bins"][17] == 6
+    assert out["columns"][1]["months"] == [("2025-01", 3), ("2025-03", 1)]
+    assert out["columns"][2]["top"] == [("a", 7), ("b", 2)]
+
+    mem = profile_rows([[1, "2025-01-05", "a"], [3, "2025-02-01", "a"], [None, None, "b"]], cols[:3])
+    assert mem["rows"] == 3
+    assert mem["columns"][0]["filled"] == 2 and mem["columns"][0]["min"] == 1.0 and sum(mem["columns"][0]["bins"]) == 2
+    assert mem["columns"][1]["months"] == [("2025-01", 1), ("2025-02", 1)]
+    assert mem["columns"][2]["top"] == [("a", 2), ("b", 1)] and mem["columns"][2]["distinct"] == 2
+
+
+def test_sf_profile_table_runs_two_queries_with_filters(monkeypatch):
+    import contextlib
+    import snowflake_query_runner as S
+    from snowflake_sql import ColumnFilter
+    seen = []
+
+    class Cur:
+        def execute(self, sql, params=None):
+            seen.append((sql, params))
+
+        def fetchone(self):
+            return [3, 3, 3, 1.0, 5.0, 3.0, 2, 2, None, None, None]
+
+        def fetchall(self):
+            return [(0, "0", 1), (0, "17", 2), (1, "a", 2), (1, "b", 1)]
+
+        def close(self):
+            pass
+
+    class Conn:
+        def cursor(self):
+            return Cur()
+
+    @contextlib.contextmanager
+    def pooled(*a, **k):
+        yield Conn()
+
+    monkeypatch.setattr(S, "_pooled", pooled)
+    monkeypatch.setattr(S, "_apply_statement_timeout", lambda *a: None)
+    monkeypatch.setattr(S, "_profile_config", lambda *a: {"statement_timeout_seconds": 60})
+    monkeypatch.setattr(S, "_use_profile", lambda *a: S.READ_PROFILE)
+    monkeypatch.setattr(S, "_fetch_columns", lambda *a, **k: [{"name": "N", "data_type": "NUMBER"}, {"name": "S", "data_type": "TEXT"}])
+    out = S.profile_data(S.ProfileRequest(source="table", database="D", schema="SC", table="T",
+                                          filters=[ColumnFilter(col="S", op="eq", value="a")]), auth={"user": {"email": "a@x.com"}})
+    assert out["rows"] == 3 and out["columns"][0]["bins"][17] == 2 and out["columns"][1]["top"] == [("a", 2), ("b", 1)]
+    assert out["columns"][0]["type"] == "NUMBER"
+    (stats_sql, stats_params), (dist_sql, dist_params) = seen
+    assert 'FROM "D"."SC"."T" WHERE' in stats_sql and stats_params == ("a",)
+    assert dist_sql.count("UNION ALL") == 1 and dist_params == ("a", "a")
+
+
+def test_sf_profile_result_needs_a_live_result(monkeypatch):
+    import pytest
+    import snowflake_query_runner as S
+    from fastapi import HTTPException
+    monkeypatch.setattr(S, "_get_job", lambda *a, **k: {"status": "failed", "returns_rows": True, "last_access": 0})
+    monkeypatch.setattr(S, "_touch", lambda job: None)
+    with pytest.raises(HTTPException) as e:
+        S.profile_data(S.ProfileRequest(source="result", job_id="x"), auth={"user": {"email": "a@x.com"}})
+    assert e.value.status_code == 409

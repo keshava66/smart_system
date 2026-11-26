@@ -8,6 +8,7 @@ No connections and no state here.
 from __future__ import annotations
 
 import json
+import math
 import re
 import time
 from dataclasses import dataclass
@@ -675,3 +676,193 @@ def build_order_by(sort: Optional[List[Dict[str, str]]], valid_columns: Optional
             raise HTTPException(status_code=400, detail=f"'{col}' is not a column of this result")
         parts.append(f"{quote_ident(col)} {'ASC' if direction == 'asc' else 'DESC'} NULLS LAST")
     return (" ORDER BY " + ", ".join(parts)) if parts else ""
+
+
+# ============================================================================
+# Column profile of a whole table or result (Data Studio's Profile tab, past
+# the page in the browser). Two queries: one row of counts, ranges and
+# distinct counts for every column, then one UNION ALL of each column's
+# distribution: 18 equal-width bins for numbers, months for dates, the six
+# most common values for everything else. Shared by both engines; `dialect`
+# picks the few functions that differ.
+# ============================================================================
+
+PROFILE_MAX_COLUMNS = 60
+PROFILE_BINS = 18
+PROFILE_TOP = 6
+PROFILE_KEY_CHARS = 200
+PROFILE_MAX_MONTHS = 600
+
+
+def profile_family(type_name: str) -> str:
+    """The same families the grid uses (paneLib.js typeFamily), with
+    time-of-day kept apart from dates: it has no month to bin by."""
+    u = (type_name or "").upper().strip()
+    if u.endswith("[]"):
+        return "vec"
+    if re.match(r"^(NUMBER|FLOAT|FIXED|REAL|DECIMAL|NUMERIC|INT|INTEGER|BIGINT|SMALLINT|TINYINT|BYTEINT|DOUBLE)", u):
+        return "num"
+    if re.match(r"^TIME(\(|$| WITH| WITHOUT)", u):
+        return "text"
+    if re.match(r"^(DATE|TIMESTAMP|DATETIME)", u):
+        return "time"
+    if u.startswith("BOOL"):
+        return "bool"
+    if re.match(r"^(VARIANT|OBJECT|ARRAY|MAP|JSON)", u):
+        return "json"
+    if re.match(r"^(BINARY|VARBINARY|BYTEA)", u):
+        return "bin"
+    if re.match(r"^(GEOGRAPHY|GEOMETRY)", u):
+        return "geo"
+    if u.startswith("VECTOR"):
+        return "vec"
+    return "text"
+
+
+def _as_text(expr: str, dialect: str) -> str:
+    return f"CAST({expr} AS TEXT)" if dialect == "postgres" else f"TO_VARCHAR({expr})"
+
+
+def _as_double(expr: str, dialect: str) -> str:
+    return f"CAST({expr} AS DOUBLE PRECISION)" if dialect == "postgres" else f"CAST({expr} AS DOUBLE)"
+
+
+def _distinct_key(col: str, family: str, dialect: str) -> Optional[str]:
+    if family in ("bin", "geo", "vec"):
+        return None
+    if family in ("num", "time", "bool"):
+        return col
+    # Long text and JSON compare by a hash: exact enough, and far cheaper to sort.
+    return f"md5({_as_text(col, dialect)})" if dialect == "postgres" else f"HASH({col})"
+
+
+def profile_stats_sql(source: str, where: str, columns: List[tuple], dialect: str) -> str:
+    """One row: COUNT(*), then per column filled / distinct (/ min / max / avg)."""
+    parts = ["COUNT(*)"]
+    for i, (name, family) in enumerate(columns):
+        col = quote_ident(name)
+        key = _distinct_key(col, family, dialect)
+        parts.append(f"COUNT({col}) AS f{i}")
+        parts.append(f"COUNT(DISTINCT {key}) AS d{i}" if key else f"NULL AS d{i}")
+        if family == "num":
+            d = _as_double(col, dialect)
+            parts += [f"MIN({d}) AS lo{i}", f"MAX({d}) AS hi{i}", f"AVG({d}) AS av{i}"]
+        elif family == "time":
+            parts += [f"{_as_text(f'MIN({col})', dialect)} AS lo{i}", f"{_as_text(f'MAX({col})', dialect)} AS hi{i}", f"NULL AS av{i}"]
+        else:
+            parts += [f"NULL AS lo{i}", f"NULL AS hi{i}", f"NULL AS av{i}"]
+    return f"SELECT {', '.join(parts)} FROM {source}{where}"
+
+
+def profile_stats(row, columns: List[tuple]) -> Dict[str, Any]:
+    """profile_stats_sql's one row, read back per column."""
+    total = int(row[0] or 0)
+    out = []
+    for i, (name, family) in enumerate(columns):
+        base = 1 + i * 5
+        filled, distinct, lo, hi, avg = row[base:base + 5]
+        c: Dict[str, Any] = {"name": name, "family": family, "filled": int(filled or 0),
+                             "distinct": None if distinct is None else int(distinct)}
+        if family == "num" and lo is not None:
+            c.update(min=float(lo), max=float(hi), avg=None if avg is None else float(avg))
+        elif family == "time" and lo is not None:
+            c.update(min=str(lo), max=str(hi))
+        out.append(c)
+    return {"rows": total, "columns": out}
+
+
+def profile_dist_sql(source: str, where: str, stats: Dict[str, Any], dialect: str) -> Optional[tuple]:
+    """(sql, branch count) for every column's distribution, or None if there is
+    nothing to bin. `where` is either "" or " WHERE ..." and is applied in
+    every branch, so its parameters repeat once per branch."""
+    branches = []
+    for i, c in enumerate(stats["columns"]):
+        if not c["filled"] or c["family"] in ("bin", "geo", "vec"):
+            continue
+        col = quote_ident(c["name"])
+        cond = f"{col} IS NOT NULL" + (f" AND ({where[len(' WHERE '):]})" if where else "")
+        if c["family"] == "num" and "min" in c:
+            lo, hi = c["min"], c["max"]
+            if not (math.isfinite(lo) and math.isfinite(hi)):
+                continue
+            span = hi - lo
+            d = _as_double(col, dialect)
+            bucket = "0" if span == 0 else f"LEAST({PROFILE_BINS - 1}, FLOOR(({d} - ({lo!r})) / ({span!r}) * {PROFILE_BINS}))"
+            key, tail = _as_text(bucket, dialect), ""
+        elif c["family"] == "time" and "min" in c:
+            key, tail = f"TO_CHAR({col}, 'YYYY-MM')", f" ORDER BY 2 LIMIT {PROFILE_MAX_MONTHS}"
+        elif c["distinct"] is not None and c["distinct"] == c["filled"] and c["filled"] > 1:
+            # Every value differs: one example is all a summary can say.
+            branches.append(f"SELECT * FROM (SELECT {i} AS c, LEFT({_as_text(col, dialect)}, {PROFILE_KEY_CHARS}) AS k, 1 AS n "
+                            f"FROM {source} WHERE {cond} LIMIT 1) p{i}")
+            continue
+        else:
+            key, tail = f"LEFT({_as_text(col, dialect)}, {PROFILE_KEY_CHARS})", f" ORDER BY 3 DESC LIMIT {PROFILE_TOP}"
+        branches.append(f"SELECT * FROM (SELECT {i} AS c, {key} AS k, COUNT(*) AS n FROM {source} WHERE {cond} GROUP BY 2{tail}) p{i}")
+    if not branches:
+        return None
+    return " UNION ALL ".join(branches), len(branches)
+
+
+def profile_finish(stats: Dict[str, Any], dist_rows) -> Dict[str, Any]:
+    """Fold the distribution rows into the per-column stats."""
+    by_col: Dict[int, list] = {}
+    for c, k, n in dist_rows or []:
+        by_col.setdefault(int(c), []).append((None if k is None else str(k), int(n)))
+    for i, c in enumerate(stats["columns"]):
+        got = by_col.get(i, [])
+        if c["family"] == "num" and "min" in c:
+            bins = [0] * PROFILE_BINS
+            for k, n in got:
+                try:
+                    bins[min(PROFILE_BINS - 1, max(0, int(float(k))))] += n
+                except (TypeError, ValueError):
+                    pass
+            c["bins"] = bins
+        elif c["family"] == "time" and "min" in c:
+            c["months"] = sorted(got)
+        else:
+            c["top"] = sorted(got, key=lambda kv: -kv[1])
+    return stats
+
+
+def profile_rows(rows: List[list], columns: List[tuple]) -> Dict[str, Any]:
+    """The same profile, worked out in Python, for a result held in memory."""
+    total = len(rows)
+    stats_cols = []
+    for i, (name, family) in enumerate(columns):
+        vals = [r[i] for r in rows if r[i] is not None and r[i] != ""]
+        c: Dict[str, Any] = {"name": name, "family": family, "filled": len(vals)}
+        keyed = [json.dumps(v, sort_keys=True, default=str) if isinstance(v, (dict, list)) else str(v) for v in vals]
+        c["distinct"] = None if family in ("bin", "geo", "vec") else len(set(keyed))
+        if family == "num":
+            nums = []
+            for v in vals:
+                try:
+                    f = float(v)
+                except (TypeError, ValueError):
+                    continue
+                if math.isfinite(f):
+                    nums.append(f)
+            if nums:
+                lo, hi = min(nums), max(nums)
+                c.update(min=lo, max=hi, avg=sum(nums) / len(nums))
+                bins = [0] * PROFILE_BINS
+                for f in nums:
+                    bins[0 if hi == lo else min(PROFILE_BINS - 1, int((f - lo) / (hi - lo) * PROFILE_BINS))] += 1
+                c["bins"] = bins
+        elif family == "time":
+            texts = sorted(str(v) for v in vals)
+            if texts:
+                c.update(min=texts[0], max=texts[-1])
+                months: Dict[str, int] = {}
+                for t in texts:
+                    months[t[:7]] = months.get(t[:7], 0) + 1
+                c["months"] = sorted(months.items())
+        if "bins" not in c and "months" not in c and family not in ("bin", "geo", "vec"):
+            counts: Dict[str, int] = {}
+            for k in keyed:
+                counts[k[:PROFILE_KEY_CHARS]] = counts.get(k[:PROFILE_KEY_CHARS], 0) + 1
+            c["top"] = sorted(counts.items(), key=lambda kv: -kv[1])[:PROFILE_TOP]
+        stats_cols.append(c)
+    return {"rows": total, "columns": stats_cols}

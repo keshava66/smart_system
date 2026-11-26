@@ -25,6 +25,7 @@ import db
 import shared_worksheets
 from auth import require_permission
 from snowflake_sql import (
+    PROFILE_MAX_COLUMNS, profile_dist_sql, profile_family, profile_finish, profile_rows, profile_stats, profile_stats_sql,
     quote_ident, qualified, _to_json_safe, _flatten_for_text, _strip_sql_comments, SqlClassification,
     plan_statements, confirm_detail, failed_at, _statement_result, ColumnFilter,
     build_where, build_order_by,
@@ -2390,6 +2391,94 @@ def _friendly_result_scan_error(e: Exception) -> str:
     if "does not exist" in text.lower() and "result" in text.lower():
         return "This result set has expired in Snowflake (results are kept for 24 hours). Re-run the query."
     return f"Failed to fetch rows: {text}"
+
+
+class ProfileRequest(BaseModel):
+    """Profile past the page in the browser: a whole table (source "table") or
+    every row of a finished query's result (source "result"), with the
+    grid's filters when it has any."""
+    source: str = Field(..., pattern="^(table|result)$")
+    database: Optional[str] = None
+    schema_: Optional[str] = Field(None, alias="schema")
+    table: Optional[str] = None
+    job_id: Optional[str] = None
+    filters: Optional[List[ColumnFilter]] = None
+
+    model_config = {"populate_by_name": True}
+
+
+_QUERY_ID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+def _profile_capped(columns: List[tuple]):
+    return columns[:PROFILE_MAX_COLUMNS], max(0, len(columns) - PROFILE_MAX_COLUMNS)
+
+
+@snowflake_router.post("/profile")
+def profile_data(body: ProfileRequest, conn_id: Optional[str] = Query(None), role: Optional[str] = Query(None),
+                 auth: dict = Depends(sf_auth)):
+    """Counts, ranges, distinct values and distributions for every column of a
+    whole table or result, worked out by Snowflake rather than the browser."""
+    started = time.time()
+    if body.source == "result":
+        if not body.job_id:
+            raise HTTPException(status_code=400, detail="job_id is required")
+        job = _get_job(body.job_id, auth["user"]["email"], shared=True)
+        _touch(job)
+        if job["status"] != "success" or not job["returns_rows"]:
+            raise HTTPException(status_code=409, detail="This result is not available any more. Run the query again.")
+        names = [c["name"] for c in job["columns"]]
+        types = {c["name"]: c.get("display_type") or c.get("type") or "" for c in job["columns"]}
+        cols, skipped = _profile_capped([(c["name"], profile_family(c.get("type"))) for c in job["columns"]])
+        if job["inline_rows"] is not None:
+            rows, _ = _paged_inline(job, RowsRequest(page=1, page_size=max(1, len(job["inline_rows"])), filters=body.filters))
+            out = profile_rows([[r[names.index(n)] for n, _ in cols] for r in rows], cols)
+            for c in out["columns"]:
+                c["type"] = types.get(c["name"], "")
+            return {**out, "source": "result", "columns_skipped": skipped, "elapsed_ms": int((time.time() - started) * 1000)}
+        qid = job.get("query_id") or ""
+        if not _QUERY_ID.match(qid):
+            raise HTTPException(status_code=409, detail="This result can't be read back. Run the query again.")
+        # RESULT_SCAN normally takes the id bound; here it appears once per
+        # branch of a UNION, so the id (checked above to be a bare UUID) is inlined.
+        source = f"TABLE(RESULT_SCAN('{qid}'))"
+        database, schema, profile = job["database"], job["schema"], job["profile"]
+    else:
+        if not (body.database and body.schema_ and body.table):
+            raise HTTPException(status_code=400, detail="database, schema and table are required")
+        profile = _use_profile(None, conn_id, role)
+        table_cols = _fetch_columns(body.database, body.schema_, body.table, profile=profile)
+        names = [c["name"] for c in table_cols]
+        types = {c["name"]: c["data_type"] for c in table_cols}
+        cols, skipped = _profile_capped([(c["name"], profile_family(c["data_type"])) for c in table_cols])
+        source = qualified(body.database, body.schema_, body.table)
+        database, schema = body.database, body.schema_
+
+    where, params = build_where(body.filters, names)
+    timeout = _profile_config(profile)["statement_timeout_seconds"]
+    try:
+        with _pooled(database, schema, profile=profile) as conn:
+            cur = conn.cursor()
+            try:
+                _apply_statement_timeout(conn, cur, timeout)
+                cur.execute(profile_stats_sql(source, where, cols, "snowflake"), tuple(params))
+                stats = profile_stats(cur.fetchone(), cols)
+                dist = profile_dist_sql(source, where, stats, "snowflake")
+                rows = []
+                if dist:
+                    sql, branches = dist
+                    cur.execute(sql, tuple(params) * branches)
+                    rows = cur.fetchall()
+            finally:
+                cur.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not profile this {'result' if body.source == 'result' else 'table'}: {e}")
+    out = profile_finish(stats, rows)
+    for c in out["columns"]:
+        c["type"] = types.get(c["name"], "")
+    return {**out, "source": body.source, "columns_skipped": skipped, "elapsed_ms": int((time.time() - started) * 1000)}
 
 
 @snowflake_router.post("/query/{job_id}/cell")
