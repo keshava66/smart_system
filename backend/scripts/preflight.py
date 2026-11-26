@@ -82,7 +82,7 @@ EXPECTED = {
     "frontend/src/pages/dataStudio/sf_pg/grid.jsx": "90cede707c3f13202c3dab833e861801608f636c35e130f5f348c5a3f37eee17",
     "frontend/src/pages/dataStudio/sf_pg/paneLib.js": "466939ab17e92c378fce8f64a5d55b76399cbfc3d4a66a70a3281fe728b8918c",
     "frontend/src/pages/dataStudio/sf_pg/paneUi.jsx": "716d31cb1262c96e51b46cf2f2797918be32cb8ed16b1611ee02f32754cd4f90",
-    "frontend/src/pages/dataStudio/sf_pg/sf_pg_pane.jsx": "01f7ee6d00d62e1aa8ff39017c89a2aadcab165552b20ad36554f1946d49efa6",
+    "frontend/src/pages/dataStudio/sf_pg/sf_pg_pane.jsx": "a000ad2176f28a8860d8587299d607c15d5fa4389a5f059e5f31f98434340081",
     "frontend/src/pages/dataStudio/sf_pg/valuePreview.jsx": "bd7cad893e01734a6acad618b46eaa445fec33a4eacfba9b584028c848e92f5c",
     "frontend/src/pages/dataStudio/sf_pg/valueViewer.jsx": "0e72118b93a268384497b5547e971bb78a337723d431056e1c1055fe8275b9d1",
     "frontend/src/pages/dataStudio/shared/studioHelpers.jsx": "6c0bbefcc87e1c872343b57122ad7ab57997dbc16e946c75437d0ec3cea29362",
@@ -90,7 +90,7 @@ EXPECTED = {
     "frontend/tests/bdc.test.jsx": "78ecdf7e8560fbfec50962b8baddaf66ba7d867cdaca235476caf4f8e5c987ec",
     "frontend/tests/dqe.test.jsx": "455ac719038fa7b7bc625898f50d8069a6e7da5f562a4bfb84cbe232b31f6ee9",
     "frontend/tests/studioExplorer.test.jsx": "0270586122d784c48bcb14741af77d200258fe0a880107dbc5c18dca2d0b4066",
-    "frontend/tests/studioTips.test.jsx": "87b7200017b75a6e468bf435d09bbdc6f799dfe54223f7c8a2433715800f432f",
+    "frontend/tests/studioTips.test.jsx": "74e09807da8b870efc8cbe3561fc8f8b3c0fd1d09e8d3c2ed122c0bf53ecde4c",
     "frontend/tests/studioValueViewer.test.jsx": "d6c2851fee5b93bad454a64beb2f36dc29ca43c6d30e94da2037e89913d88559",
 }
 

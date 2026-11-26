@@ -308,9 +308,10 @@ const tipNeeded = (el) => {
   return !(el.innerText || el.value || '').trim();
 };
 
-// Inside [data-tip-delay] (the explorer tree) a tip waits this long, so
-// running the pointer down the tree doesn't flash one per row. Moving on
-// from a tip that was showing (within TIP_WARM_MS) skips the wait.
+// Inside [data-tip-delay] (the explorer tree, the results and the data
+// editor) a tip waits this long, so running the pointer over rows or cells
+// doesn't flash one per row. Moving on from a tip that was showing (within
+// TIP_WARM_MS) skips the wait.
 const TIP_DELAY_MS = 500;
 const TIP_WARM_MS = 300;
 
@@ -2444,6 +2445,7 @@ function StudioPane({ active: paneActive = true }) {
         {!isCopier && !(editorMax && active.kind === 'query') && !waiting && (
           <div
             ref={el => { resultsRef.current = el; setResultsEl(el); }}
+            data-tip-delay
             className={`relative flex-1 min-h-0 min-w-0 flex flex-col bg-white rounded-[12px] overflow-hidden shadow-[0_0_0_1px_#e8e6e3,0_1px_2px_rgba(49,44,42,.04)] ${sideBySide && active.kind === 'query' ? '' : 'mx-2 mb-2'}`}
           >
             {isData && (

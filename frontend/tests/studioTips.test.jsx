@@ -29,6 +29,7 @@ it('delays tips in the tree, and not elsewhere', () => {
     <TipLayer>
       <div data-tip-delay><button id="a" title="Refresh objects" /><button id="b" title="Hide explorer" /></div>
       <button id="c" title="Run" />
+      <div data-tip-delay><button id="d" title="Edit rows" /></div>
     </TipLayer>,
   ));
   const [a, b, c] = ['a', 'b', 'c'].map((id) => document.getElementById(id));
@@ -52,6 +53,15 @@ it('delays tips in the tree, and not elsewhere', () => {
   out(a, host);                              // left before the delay ran out: nothing shows
   act(() => vi.advanceTimersByTime(1000));
   expect(tip().getAttribute('aria-hidden')).toBe('true');
+
+  out(c, host);
+  act(() => vi.advanceTimersByTime(1000));
+  over(document.getElementById('d'));         // the results area waits too
+  expect(tip().getAttribute('aria-hidden')).toBe('true');
+  act(() => vi.advanceTimersByTime(500));
+  expect(tip().textContent).toBe('Edit rows');
+  out(document.getElementById('d'), host);
+  act(() => vi.advanceTimersByTime(1000));
 
   over(c);                                   // outside the tree: no wait
   expect(tip().getAttribute('aria-hidden')).toBe('false');
