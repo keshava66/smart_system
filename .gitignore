@@ -12,3 +12,8 @@ __pycache__/
 # Server-local start scripts (copied from the .example files)
 /start_frontend.sh
 /start_backend.sh
+
+# impeccable runtime captures
+.impeccable/review/
+.impeccable/questions/
+.impeccable/mocks/

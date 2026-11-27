@@ -3654,7 +3654,7 @@ export default function Unstructured() {
       ) : activeDocType === 'nipo' ? (
         <NipoExplorer logInPage={logInPage} activeTab={activeNipoTab} onBusyChange={setNipoBusy} />
       ) : activeDocType === 'rimingest' ? (
-        <RimIngestionExplorer logInPage={logInPage} activeTab={activeIngestTab} onBusyChange={setIngestBusy} onSynced={setIngestSyncedAt} />
+        <RimIngestionExplorer logInPage={logInPage} activeTab={activeIngestTab} onTabChange={setActiveIngestTab} onBusyChange={setIngestBusy} onSynced={setIngestSyncedAt} />
       ) : activeDocType === 'fda' ? (
         <FDAExplorer logInPage={logInPage} activeTab={activeFdaTab} onBusyChange={setFdaBusy} dashboard={activeFdaDashboard} />
       ) : (

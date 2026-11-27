@@ -398,6 +398,7 @@ def rim_ingestion_dashboard(scope: Scope = Depends(scope_params), refresh: bool 
         "loaded_at": data["loaded_at"],
         "source": {"database": DATABASE, "docs_table": f"{DOCS_SCHEMA}.{DOCS_TABLE}",
                    "chunks_table": f"{CHUNKS_SCHEMA}.{scope.chunks_table}"},
+        "scope_rows": len(rows),
         "scope_documents": len({r["r_object_id"] for r in rows}),
         "options": {
             "status": facet_options(rows, "ingestion_status"),
@@ -406,6 +407,8 @@ def rim_ingestion_dashboard(scope: Scope = Depends(scope_params), refresh: bool 
             "domain": facet_options(rows, "domain"),
         },
         "kpis": kpis(view),
+        # the coverage split ignores the status pick, so picking a side highlights it instead of zeroing the other
+        "flow": kpis(apply_picks(rows, {c: v for c, v in scope.picks.items() if c != "ingestion_status"})),
         "by_product": {"rows": products[:TOP_N], "distinct": len(products)},
         "by_year": by_year(view),
     }

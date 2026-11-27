@@ -48,7 +48,7 @@ def client(monkeypatch):
 def test_dashboard_counts_each_document_once(client):
     d = client.get("/api/rim-ingestion/dashboard").json()
     assert d["kpis"] == {"documents": 3, "ingested": 1, "not_ingested": 2, "rate": 1 / 3, "chunks": 10}
-    assert d["scope_documents"] == 3
+    assert d["scope_documents"] == 3 and d["scope_rows"] == 4
     assert {r["value"]: r["documents"] for r in d["by_product"]["rows"]} == {"JNJ-1": 2, "JNJ-2": 2}
     assert d["by_year"]["rows"] == [
         {"year": 2021, "ingested": 1, "not_ingested": 0},
@@ -61,6 +61,8 @@ def test_dashboard_counts_each_document_once(client):
 def test_picks_filter_and_cache_is_reused(client):
     d = client.get("/api/rim-ingestion/dashboard", params={"approval": "Draft"}).json()
     assert d["kpis"]["documents"] == 1 and d["kpis"]["ingested"] == 0
+    d = client.get("/api/rim-ingestion/dashboard", params={"status": ri.NOT_INGESTED}).json()
+    assert d["kpis"]["ingested"] == 0 and d["flow"]["ingested"] == 1 and d["flow"]["documents"] == 3
     client.get("/api/rim-ingestion/rows", params={"status": ri.INGESTED})
     assert len(LOADS) == 1  # page filters never go back to Postgres
     client.get("/api/rim-ingestion/dashboard", params={"refresh": True})
