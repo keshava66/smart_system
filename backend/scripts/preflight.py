@@ -79,7 +79,7 @@ EXPECTED = {
     "frontend/src/pages/SafetyDQ.jsx": "a7e6eee8eeaac2ce7afcad4eb2d88666fdede3f621f762d99b65458cfe5d45d1",
     "frontend/src/pages/Unstructured.jsx": "aeaaeb1433c843ab6998c772a143ed932576c879686060d6d54d3c0e3e5aabeb",
     "frontend/src/pages/components/CommunicationParts.jsx": "fefa6a4930093da06874349d85b8fa8936c4865ff1a8bd06fa4c2e8d2cec6391",
-    "frontend/src/pages/components/RimIngestionExplorer.jsx": "d9f3d0dfc223ce9088716c141a074af9f84db441d80d74791938b2a7211b348b",
+    "frontend/src/pages/components/RimIngestionExplorer.jsx": "833dd003cb33c376aa73f9729b5c625dc19a0fa1d722bbb4aa6ad519ef3856a2",
     "frontend/src/pages/components/UnstructuredWelcome.jsx": "b17f8f2bdcc5b9ca09c9422979a0dca100db7258c36ec9df99d1f49f881b3a9a",
     "frontend/src/pages/dataApi/dataApiDocs.js": "57dca1cf847121ef4049bdc0d7f5c4f852d06ea691a98b551c962ce98a1e6879",
     "frontend/src/pages/dataStudio/panes.js": "a5251cd9bee298b914b8c4242a943928b8a75cc71c82cb40b7746ba1e835c78a",

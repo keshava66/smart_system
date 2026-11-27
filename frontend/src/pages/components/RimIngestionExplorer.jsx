@@ -72,6 +72,8 @@ const STYLES = `
 .ri-live { animation: ri-pulse 2s ease-out infinite; }
 .ri-progress::after { content: ''; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg,transparent,#eb1700,transparent); animation: ri-bar 1.1s cubic-bezier(.4,0,.2,1) infinite; }
 .ri-grow { transition: width .55s cubic-bezier(.2,0,0,1), height .55s cubic-bezier(.2,0,0,1), stroke-dashoffset .8s cubic-bezier(.2,0,0,1); }
+.ri-root :is(button, select, [tabindex]):focus-visible { outline: 2px solid #0f68b2 !important; outline-offset: 2px; }
+.ri-hatch { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.38) 0 2px, transparent 2px 6px); }
 .ri-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
 .ri-scroll::-webkit-scrollbar-thumb { background: #d5cfc9; border-radius: 8px; }
 html.reduce-motion .ri-skel, html.reduce-motion .ri-in, html.reduce-motion .ri-live, html.reduce-motion .ri-progress::after { animation: none; }
@@ -219,7 +221,7 @@ const CardHead = ({ title, hint, right }) => (
   <div className="flex items-start justify-between gap-3 mb-4">
     <div className="min-w-0">
       <h3 className="font-johnson-display font-bold text-[15px] leading-tight text-jj-gray-08">{title}</h3>
-      {hint && <p className="mt-1 text-[11.5px] font-johnson-text text-jj-gray-06">{hint}</p>}
+      {hint && <p className="mt-1 text-[11.5px] font-johnson-text text-jj-gray-07">{hint}</p>}
     </div>
     {right}
   </div>
@@ -231,7 +233,7 @@ function Legend() {
   return (
     <div className="flex items-center gap-4 text-[11px] font-johnson-text text-jj-gray-07">
       {[[INGESTED, GREEN], [NOT_INGESTED, RED]].map(([l, c]) => (
-        <span key={l} className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: c }} />{l}</span>
+        <span key={l} className="inline-flex items-center gap-1.5"><span className={`w-3 h-3 rounded-[3px] ${l === NOT_INGESTED ? 'ri-hatch' : ''}`} style={{ backgroundColor: c }} />{l}</span>
       ))}
     </div>
   );
@@ -255,7 +257,7 @@ function Toggle({ checked, onChange, label, hint }) {
       aria-checked={checked}
       title={hint}
       onClick={() => onChange(!checked)}
-      className="group inline-flex items-center gap-2.5 h-9 pl-1.5 pr-3 rounded-full border border-jj-gray-02 bg-white hover:border-jj-gray-03 text-[12.5px] font-johnson-text text-jj-gray-08 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-jj-blue-03/40 transition-colors"
+      className="group inline-flex items-center gap-2.5 h-9 pl-1.5 pr-3 rounded-full border border-jj-gray-02 bg-white hover:border-jj-gray-03 text-[12.5px] font-johnson-text text-jj-gray-08 whitespace-nowrap transition-colors"
     >
       <span className={`relative w-[30px] h-[18px] rounded-full transition-colors ${checked ? 'bg-jj-gray-08' : 'bg-jj-gray-03'}`}>
         <span className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[12px]' : ''}`} />
@@ -265,7 +267,7 @@ function Toggle({ checked, onChange, label, hint }) {
   );
 }
 
-const iconBtn = 'inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-full border text-[12.5px] font-johnson-text whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jj-blue-03/40 disabled:opacity-40 disabled:cursor-not-allowed';
+const iconBtn = 'inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-full border text-[12.5px] font-johnson-text whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 
 // Multi-select popover with search, counts and Only / Clear.
 function PickMenu({ label, options, selected, onChange, loading, wide = false, emptyText = 'No values', allLabel = 'All' }) {
@@ -292,7 +294,7 @@ function PickMenu({ label, options, selected, onChange, loading, wide = false, e
         className={`${iconBtn} w-full justify-between ${selected.length ? 'bg-jj-gray-08 text-white border-jj-gray-08' : 'bg-white text-jj-gray-08 border-jj-gray-02 hover:border-jj-gray-03'}`}
       >
         <span className="flex items-center gap-1.5 min-w-0">
-          <span className={selected.length ? 'text-white/70' : 'text-jj-gray-06'}>{label}</span>
+          <span className={selected.length ? 'text-white/70' : 'text-jj-gray-07'}>{label}</span>
           <span className="font-medium truncate max-w-[150px]">{summary}</span>
         </span>
         <ChevronDown size={14} className={`flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
@@ -304,19 +306,19 @@ function PickMenu({ label, options, selected, onChange, loading, wide = false, e
         >
           <div className="p-2.5 border-b border-jj-gray-01">
             <label className="flex items-center gap-2 h-9 px-3 rounded-xl bg-jj-gray-01 focus-within:ring-2 focus-within:ring-jj-blue-03/30">
-              <Search size={14} className="text-jj-gray-06 flex-shrink-0" aria-hidden="true" />
+              <Search size={14} className="text-jj-gray-07 flex-shrink-0" aria-hidden="true" />
               <input
                 autoFocus
                 value={q}
                 onChange={e => setQ(e.target.value)}
                 placeholder={`Search ${label.toLowerCase()}`}
-                className="w-full bg-transparent text-[12.5px] font-johnson-text text-jj-gray-08 placeholder:text-jj-gray-05 focus:outline-none"
+                className="w-full bg-transparent text-[12.5px] font-johnson-text text-jj-gray-08 placeholder:text-jj-gray-06 focus:outline-none"
               />
             </label>
           </div>
           <div className="max-h-[300px] overflow-y-auto ri-scroll py-1.5">
-            {loading && <div className="px-4 py-3 text-xs font-johnson-text text-jj-gray-06">Loading…</div>}
-            {!loading && shown.length === 0 && <div className="px-4 py-3 text-xs font-johnson-text text-jj-gray-06">{term ? 'No matches' : emptyText}</div>}
+            {loading && <div className="px-4 py-3 text-xs font-johnson-text text-jj-gray-07">Loading…</div>}
+            {!loading && shown.length === 0 && <div className="px-4 py-3 text-xs font-johnson-text text-jj-gray-07">{term ? 'No matches' : emptyText}</div>}
             {!loading && shown.map(o => {
               const on = sel.has(o.value);
               return (
@@ -327,18 +329,18 @@ function PickMenu({ label, options, selected, onChange, loading, wide = false, e
                     </span>
                     <span className={`truncate text-[12.5px] font-johnson-text ${on ? 'font-bold text-jj-gray-08' : 'text-jj-gray-08'}`}>{o.value}</span>
                   </button>
-                  <button type="button" onClick={() => onChange([o.value])} className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-[10.5px] font-johnson-text text-jj-blue-03 px-1">Only</button>
-                  {o.count != null && <span className="text-[11px] font-johnson-text text-jj-gray-06 tabular-nums">{compact(o.count)}</span>}
+                  <button type="button" onClick={() => onChange([o.value])} className="opacity-0 group-hover:opacity-100 focus:opacity-100 min-h-[24px] min-w-[36px] rounded-md text-[11px] font-johnson-text text-jj-blue-03 hover:bg-white">Only</button>
+                  {o.count != null && <span className="text-[11px] font-johnson-text text-jj-gray-07 tabular-nums">{compact(o.count)}</span>}
                 </div>
               );
             })}
             {matches.length > shown.length && (
-              <div className="px-4 py-2 text-[11px] font-johnson-text text-jj-gray-06">{(matches.length - shown.length).toLocaleString()} more. Refine the search to see them.</div>
+              <div className="px-4 py-2 text-[11px] font-johnson-text text-jj-gray-07">{(matches.length - shown.length).toLocaleString()} more. Refine the search to see them.</div>
             )}
           </div>
           <div className="flex items-center justify-between px-3.5 py-2.5 border-t border-jj-gray-01 bg-jj-gray-01/50">
-            <span className="text-[11px] font-johnson-text text-jj-gray-06 tabular-nums">{selected.length} of {options.length.toLocaleString()} selected</span>
-            <button type="button" onClick={() => onChange([])} disabled={!selected.length} className="text-[11.5px] font-johnson-text text-jj-blue-03 disabled:text-jj-gray-04">Clear</button>
+            <span className="text-[11px] font-johnson-text text-jj-gray-07 tabular-nums">{selected.length} of {options.length.toLocaleString()} selected</span>
+            <button type="button" onClick={() => onChange([])} disabled={!selected.length} className="text-[11.5px] font-johnson-text text-jj-blue-03 disabled:text-jj-gray-06">Clear</button>
           </div>
         </div>
       )}
@@ -362,7 +364,7 @@ function Gauge({ rate, size = 168 }) {
           </linearGradient>
         </defs>
         <circle cx="84" cy="84" r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="14" />
-        <circle cx="84" cy="84" r={r} fill="none" stroke="rgba(235,23,0,.55)" strokeWidth="14" strokeDasharray={c} strokeDashoffset={0} />
+        <circle cx="84" cy="84" r={r} fill="none" stroke="rgba(235,23,0,.55)" strokeWidth="14" strokeDasharray="3 3" />
         <circle
           className="ri-grow"
           cx="84" cy="84" r={r} fill="none" stroke="url(#ri-gauge)" strokeWidth="14" strokeLinecap="round"
@@ -371,7 +373,7 @@ function Gauge({ rate, size = 168 }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="font-johnson-display font-bold text-white text-[34px] leading-none tabular-nums">{pct(shown, 1)}</span>
-        <span className="mt-1.5 text-[10px] font-johnson-text uppercase tracking-[.2em] text-white/55">ingested</span>
+        <span className="mt-1.5 text-[11px] font-johnson-text uppercase tracking-[.2em] text-white/65">ingested</span>
       </div>
     </div>
   );
@@ -395,13 +397,13 @@ function StackedBars({ rows, onPick, pickHint }) {
               <span className="truncate text-[12px] font-johnson-text text-jj-gray-08">{r.value}</span>
               <span className="flex-shrink-0 text-[11.5px] font-johnson-text tabular-nums text-jj-gray-07">
                 <span className="text-jj-gray-08 font-medium">{fmt(total)}</span>
-                <span className="text-jj-gray-05"> · {pct(total ? r.ingested / total : 0, 0)}</span>
+                <span className="text-jj-gray-07"> · {pct(total ? r.ingested / total : 0, 0)}</span>
               </span>
             </div>
             <div className="h-2.5 rounded-full bg-jj-gray-01 overflow-hidden">
               <div className="ri-grow h-full flex rounded-full overflow-hidden" style={{ width: `${(total / max) * 100}%` }}>
                 <span className="h-full" style={{ width: `${total ? (r.ingested / total) * 100 : 0}%`, background: GREEN }} />
-                <span className="h-full flex-1" style={{ background: RED }} />
+                <span className="h-full flex-1 ri-hatch" style={{ backgroundColor: RED }} />
               </div>
             </div>
           </>
@@ -409,7 +411,7 @@ function StackedBars({ rows, onPick, pickHint }) {
         return (
           <li key={r.value} onMouseMove={e => tip.show(e, r.value, lines)} onMouseLeave={tip.hide}>
             {onPick ? (
-              <button type="button" onClick={() => onPick(r.value)} title={pickHint} className="w-full text-left rounded-lg -mx-1.5 px-1.5 py-0.5 hover:bg-jj-gray-01/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-jj-blue-03/40">
+              <button type="button" onClick={() => onPick(r.value)} title={pickHint} className="w-full text-left rounded-lg -mx-1.5 px-1.5 py-0.5 hover:bg-jj-gray-01/70">
                 {body}
               </button>
             ) : <div className="px-0 py-0.5">{body}</div>}
@@ -440,12 +442,12 @@ function YearColumns({ rows, height = 220 }) {
               ])}
               onMouseLeave={tip.hide}
             >
-              <span className="text-[10px] font-johnson-text text-jj-gray-06 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">{compact(total)}</span>
+              <span className="text-[11px] font-johnson-text text-jj-gray-07 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">{compact(total)}</span>
               <div className="ri-grow w-full max-w-[44px] flex flex-col justify-end rounded-t-md overflow-hidden group-hover:brightness-110" style={{ height: (total / max) * height }}>
-                <span style={{ height: `${total ? (r.not_ingested / total) * 100 : 0}%`, background: RED }} />
+                <span className="ri-hatch" style={{ height: `${total ? (r.not_ingested / total) * 100 : 0}%`, backgroundColor: RED }} />
                 <span className="flex-1" style={{ background: GREEN }} />
               </div>
-              <span className="text-[10.5px] font-johnson-text text-jj-gray-07 tabular-nums">{rows.length > 14 ? `'${String(r.year).slice(2)}` : r.year}</span>
+              <span className="text-[11px] font-johnson-text text-jj-gray-07 tabular-nums">{rows.length > 14 ? `'${String(r.year).slice(2)}` : r.year}</span>
             </div>
           );
         })}
@@ -463,7 +465,7 @@ function ErrorCard({ message, onRetry }) {
       <span className="w-11 h-11 rounded-2xl bg-jj-red/10 text-jj-red flex items-center justify-center flex-shrink-0"><Activity size={20} aria-hidden="true" /></span>
       <div className="flex-1 min-w-0">
         <div className="font-johnson-display font-bold text-[15px] text-jj-gray-08">Couldn&apos;t load ingestion data</div>
-        <div className="mt-1 text-[12.5px] font-johnson-text text-jj-gray-06 break-words">{message}</div>
+        <div className="mt-1 text-[12.5px] font-johnson-text text-jj-gray-07 break-words">{message}</div>
       </div>
       <button type="button" onClick={onRetry} className={`${iconBtn} bg-jj-gray-08 text-white border-jj-gray-08 hover:bg-black`}>
         <RefreshCw size={14} aria-hidden="true" /> Try again
@@ -477,7 +479,7 @@ function EmptyCard({ title, body, action }) {
     <Card className="px-6 py-14 flex flex-col items-center text-center ri-in">
       <span className="w-12 h-12 rounded-2xl bg-jj-gray-01 text-jj-gray-07 flex items-center justify-center"><FileSearch size={22} aria-hidden="true" /></span>
       <div className="mt-4 font-johnson-display font-bold text-[16px] text-jj-gray-08">{title}</div>
-      <div className="mt-1.5 max-w-[420px] text-[12.5px] font-johnson-text text-jj-gray-06">{body}</div>
+      <div className="mt-1.5 max-w-[420px] text-[12.5px] font-johnson-text text-jj-gray-07">{body}</div>
       {action && <div className="mt-5">{action}</div>}
     </Card>
   );
@@ -489,12 +491,12 @@ function Kpi({ label, value, sub, accent, format = fmt }) {
   const shown = useCountUp(value);
   return (
     <div className="min-w-0 rounded-2xl bg-white/[.06] border border-white/10 px-4 py-3.5">
-      <div className="flex items-center gap-2 text-[10.5px] font-johnson-text uppercase tracking-[.14em] text-white/55">
+      <div className="flex items-center gap-2 text-[11px] font-johnson-text uppercase tracking-[.14em] text-white/65">
         {accent && <span className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} />}
         {label}
       </div>
       <div className="mt-2 font-johnson-display font-bold text-white text-[24px] sm:text-[28px] leading-none tabular-nums truncate">{format(Math.round(shown))}</div>
-      {sub && <div className="mt-1.5 text-[11px] font-johnson-text text-white/45 truncate">{sub}</div>}
+      {sub && <div className="mt-1.5 text-[11px] font-johnson-text text-white/65 truncate">{sub}</div>}
     </div>
   );
 }
@@ -514,12 +516,12 @@ function Hero({ dash }) {
         <div className="flex items-center gap-5 sm:gap-6 min-w-0">
           <Gauge rate={k.rate} />
           <div className="min-w-0">
-            <div className="text-[10.5px] font-johnson-text uppercase tracking-[.22em] text-white/50">Ingestion coverage</div>
+            <div className="text-[11px] font-johnson-text uppercase tracking-[.22em] text-white/65">Ingestion coverage</div>
             <div className="mt-2 font-johnson-display font-bold text-[20px] sm:text-[24px] leading-tight">
-              {fmt(k.ingested)} <span className="text-white/45 font-normal">of</span> {fmt(k.documents)}
+              {fmt(k.ingested)} <span className="text-white/65 font-normal">of</span> {fmt(k.documents)}
             </div>
-            <div className="mt-1 text-[12.5px] font-johnson-text text-white/60">documents have chunks in this table</div>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-johnson-text text-white/45">
+            <div className="mt-1 text-[12.5px] font-johnson-text text-white/70">documents have chunks in this table</div>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-johnson-text text-white/65">
               <span className="inline-flex items-center gap-1.5"><Database size={12} aria-hidden="true" />{dash.source.chunks_table}</span>
             </div>
           </div>
@@ -548,6 +550,9 @@ function Overview({ dash, loading, onPickProduct }) {
   const years = dash.by_year;
   return (
     <div className={`flex flex-col gap-4 transition-opacity ${loading ? 'opacity-70' : ''}`}>
+      <p role="status" aria-atomic="true" className="sr-only">
+        {`${fmt(dash.kpis.ingested)} of ${fmt(dash.kpis.documents)} documents ingested, ${pct(dash.kpis.rate)}`}
+      </p>
       <Hero dash={dash} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <Card className="p-5 sm:p-6 min-w-0 ri-in">
@@ -560,7 +565,7 @@ function Overview({ dash, loading, onPickProduct }) {
             <div className="max-h-[520px] overflow-y-auto ri-scroll pr-1">
               <StackedBars rows={products.rows} onPick={onPickProduct} pickHint="Narrow the source to this product" />
             </div>
-          ) : <div className="py-10 text-center text-xs font-johnson-text text-jj-gray-06">No products in this selection.</div>}
+          ) : <div className="py-10 text-center text-xs font-johnson-text text-jj-gray-07">No products in this selection.</div>}
         </Card>
         <Card className="p-5 sm:p-6 min-w-0 ri-in">
           <CardHead
@@ -568,7 +573,7 @@ function Overview({ dash, loading, onPickProduct }) {
             hint={years.undated ? `${fmt(years.undated)} documents have no approval date and aren't shown` : 'Every document has an approval date'}
             right={<Legend />}
           />
-          {years.rows.length ? <YearColumns rows={years.rows} /> : <div className="py-10 text-center text-xs font-johnson-text text-jj-gray-06">No approval dates in this selection.</div>}
+          {years.rows.length ? <YearColumns rows={years.rows} /> : <div className="py-10 text-center text-xs font-johnson-text text-jj-gray-07">No approval dates in this selection.</div>}
         </Card>
       </div>
     </div>
@@ -631,16 +636,16 @@ function Breakdown({ by, setBy, data, loading, error, onRetry }) {
             />
             {data.rows.length ? (
               <div className="max-h-[560px] overflow-y-auto ri-scroll pr-1"><StackedBars rows={data.rows.slice(0, data.top_n)} /></div>
-            ) : <div className="py-10 text-center text-xs font-johnson-text text-jj-gray-06">Nothing to break down.</div>}
+            ) : <div className="py-10 text-center text-xs font-johnson-text text-jj-gray-07">Nothing to break down.</div>}
           </Card>
           <Card className="min-w-0 flex flex-col overflow-hidden ri-in">
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 sm:px-6 pt-5 pb-4">
               <div>
                 <h3 className="font-johnson-display font-bold text-[15px] text-jj-gray-08">All values</h3>
-                <p className="mt-1 text-[11.5px] font-johnson-text text-jj-gray-06 tabular-nums">{fmt(rows.length)} of {fmt(data.rows.length)} shown</p>
+                <p className="mt-1 text-[11.5px] font-johnson-text text-jj-gray-07 tabular-nums">{fmt(rows.length)} of {fmt(data.rows.length)} shown</p>
               </div>
               <label className="flex items-center gap-2 h-9 px-3 rounded-full border border-jj-gray-02 bg-white w-full sm:w-[240px] focus-within:ring-2 focus-within:ring-jj-blue-03/30">
-                <Search size={14} className="text-jj-gray-06" aria-hidden="true" />
+                <Search size={14} className="text-jj-gray-07" aria-hidden="true" />
                 <input value={q} onChange={e => setQ(e.target.value)} placeholder={`Filter ${label.toLowerCase()}`} aria-label={`Filter ${label}`} className="w-full bg-transparent text-[12.5px] font-johnson-text focus:outline-none" />
               </label>
             </div>
@@ -649,7 +654,7 @@ function Breakdown({ by, setBy, data, loading, error, onRetry }) {
                 <thead className="sticky top-0 z-[1] bg-jj-gray-01/95">
                   <tr>
                     {headers.map(h => (
-                      <th key={h.col} scope="col" aria-sort={sort.col === h.col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'} className={`px-4 py-2.5 font-bold text-[10.5px] uppercase tracking-[.12em] text-jj-gray-07 whitespace-nowrap ${h.align === 'left' ? 'text-left' : 'text-right'}`}>
+                      <th key={h.col} scope="col" aria-sort={sort.col === h.col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'} className={`px-4 py-2.5 font-bold text-[11px] uppercase tracking-[.12em] text-jj-gray-07 whitespace-nowrap ${h.align === 'left' ? 'text-left' : 'text-right'}`}>
                         <button type="button" onClick={() => sortBy(h.col)} className="inline-flex items-center gap-1 hover:text-jj-gray-08">
                           {h.label}{sort.col === h.col && <Arrow dir={sort.dir} />}
                         </button>
@@ -676,7 +681,7 @@ function Breakdown({ by, setBy, data, loading, error, onRetry }) {
                     </tr>
                   ))}
                   {rows.length === 0 && (
-                    <tr><td colSpan={headers.length} className="px-4 py-10 text-center text-jj-gray-06">No values match that filter.</td></tr>
+                    <tr><td colSpan={headers.length} className="px-4 py-10 text-center text-jj-gray-07">No values match that filter.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -706,7 +711,7 @@ function CopyButton({ text, label }) {
       }}
       title={`Copy ${label}`}
       aria-label={`Copy ${label}`}
-      className="inline-flex items-center justify-center w-6 h-6 rounded-md text-jj-gray-05 hover:text-jj-gray-08 hover:bg-jj-gray-02 flex-shrink-0"
+      className="inline-flex items-center justify-center w-6 h-6 rounded-md text-jj-gray-07 hover:text-jj-gray-08 hover:bg-jj-gray-02 flex-shrink-0"
     >
       {done ? <Check size={12} className="text-jj-green-03" aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
     </button>
@@ -738,15 +743,15 @@ function DetailDrawer({ row, onClose }) {
             const empty = v == null || v === '';
             return (
               <div key={k} className="flex gap-4 py-3 border-b border-jj-gray-01 last:border-0">
-                <dt className="w-[38%] flex-shrink-0 text-[11.5px] font-johnson-text text-jj-gray-06">{label}</dt>
+                <dt className="w-[38%] flex-shrink-0 text-[11.5px] font-johnson-text text-jj-gray-07">{label}</dt>
                 <dd className="flex-1 min-w-0 flex items-start gap-1.5 text-[12.5px] font-johnson-text text-jj-gray-08 break-words">
-                  <span className="min-w-0 flex-1">{empty ? <span className="text-jj-gray-04">—</span> : k === 'chunk_count' ? fmt(v) : k === 'ingestion_status' ? v : String(v)}</span>
+                  <span className="min-w-0 flex-1">{empty ? <span className="text-jj-gray-06">—</span> : k === 'chunk_count' ? fmt(v) : k === 'ingestion_status' ? v : String(v)}</span>
                   {!empty && (k === 'r_object_id' || k === 'edms_number') && <CopyButton text={String(v)} label={label} />}
                 </dd>
               </div>
             );
           })}
-          <div className="py-4 text-[11.5px] font-johnson-text text-jj-gray-06">
+          <div className="py-4 text-[11.5px] font-johnson-text text-jj-gray-07">
             Matched on file name <code className="px-1.5 py-0.5 rounded bg-jj-gray-01 text-jj-gray-08">{row.r_object_id}.pdf</code>
           </div>
         </dl>
@@ -770,20 +775,20 @@ function Documents({ state, setState, data, loading, error, onRetry, onOpen, can
     <Card className="flex flex-col min-h-[520px] overflow-hidden ri-in">
       <div className="flex flex-wrap items-center gap-3 px-4 sm:px-5 py-4 border-b border-jj-gray-01">
         <label className="flex items-center gap-2 h-10 px-3.5 rounded-full border border-jj-gray-02 bg-jj-gray-01/60 flex-1 min-w-[220px] focus-within:bg-white focus-within:ring-2 focus-within:ring-jj-blue-03/30 transition-colors">
-          <Search size={15} className="text-jj-gray-06 flex-shrink-0" aria-hidden="true" />
+          <Search size={15} className="text-jj-gray-07 flex-shrink-0" aria-hidden="true" />
           <input
             value={search}
             onChange={e => setState(s => ({ ...s, search: e.target.value, page: 1 }))}
             placeholder="Search object ID, EDMS number or document name"
             aria-label="Search documents"
-            className="w-full bg-transparent text-[13px] font-johnson-text text-jj-gray-08 placeholder:text-jj-gray-05 focus:outline-none"
+            className="w-full bg-transparent text-[13px] font-johnson-text text-jj-gray-08 placeholder:text-jj-gray-06 focus:outline-none"
           />
           {search && (
-            <button type="button" onClick={() => setState(s => ({ ...s, search: '', page: 1 }))} aria-label="Clear search" className="text-jj-gray-06 hover:text-jj-gray-08"><X size={14} aria-hidden="true" /></button>
+            <button type="button" onClick={() => setState(s => ({ ...s, search: '', page: 1 }))} aria-label="Clear search" className="text-jj-gray-07 hover:text-jj-gray-08"><X size={14} aria-hidden="true" /></button>
           )}
         </label>
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-[12px] font-johnson-text text-jj-gray-06 tabular-nums whitespace-nowrap">
+          <span className="text-[12px] font-johnson-text text-jj-gray-07 tabular-nums whitespace-nowrap">
             {data ? `${fmt(total)} rows` : '…'}
           </span>
           {canDownload && (
@@ -809,10 +814,10 @@ function Documents({ state, setState, data, loading, error, onRetry, onOpen, can
                 <button type="button" onClick={() => onOpen(r)} className="w-full text-left px-4 py-3.5 hover:bg-jj-gray-01/60 focus:outline-none focus-visible:bg-jj-gray-01">
                   <div className="flex items-center justify-between gap-3">
                     <StatusPill value={r.ingestion_status} />
-                    <span className="text-[11px] font-johnson-text text-jj-gray-06 tabular-nums">{fmt(r.chunk_count)} chunks</span>
+                    <span className="text-[11px] font-johnson-text text-jj-gray-07 tabular-nums">{fmt(r.chunk_count)} chunks</span>
                   </div>
                   <div className="mt-2 text-[13px] font-johnson-text font-medium text-jj-gray-08 line-clamp-2">{r.object_name || '—'}</div>
-                  <div className="mt-1 text-[11.5px] font-johnson-text text-jj-gray-06 truncate">{r.product_code} · {r.r_object_id}{r.edms_number ? ` · ${r.edms_number}` : ''}</div>
+                  <div className="mt-1 text-[11.5px] font-johnson-text text-jj-gray-07 truncate">{r.product_code} · {r.r_object_id}{r.edms_number ? ` · ${r.edms_number}` : ''}</div>
                 </button>
               </li>
             ))}
@@ -823,7 +828,7 @@ function Documents({ state, setState, data, loading, error, onRetry, onOpen, can
               <thead className="sticky top-0 z-[1]">
                 <tr className="bg-jj-gray-01">
                   {COLUMNS.map(c => (
-                    <th key={c.key} scope="col" style={{ minWidth: c.width }} aria-sort={sortCol === c.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'} className={`px-4 py-3 font-bold text-[10.5px] uppercase tracking-[.12em] text-jj-gray-07 whitespace-nowrap ${c.numeric ? 'text-right' : 'text-left'}`}>
+                    <th key={c.key} scope="col" style={{ minWidth: c.width }} aria-sort={sortCol === c.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'} className={`px-4 py-3 font-bold text-[11px] uppercase tracking-[.12em] text-jj-gray-07 whitespace-nowrap ${c.numeric ? 'text-right' : 'text-left'}`}>
                       <button type="button" onClick={() => sortBy(c.key)} className="inline-flex items-center gap-1 hover:text-jj-gray-08">
                         {c.label}{sortCol === c.key && <Arrow dir={sortDir} />}
                       </button>
@@ -845,8 +850,8 @@ function Documents({ state, setState, data, loading, error, onRetry, onOpen, can
                       return (
                         <td key={c.key} style={{ minWidth: c.width, maxWidth: c.width * 1.8 }} className={`px-4 py-2.5 ${c.numeric ? 'text-right tabular-nums' : ''} ${c.mono ? 'tabular-nums' : ''}`}>
                           {c.key === 'ingestion_status' ? <StatusPill value={v} />
-                            : c.key === 'chunk_count' ? <span className={v ? 'text-jj-gray-08' : 'text-jj-gray-04'}>{fmt(v)}</span>
-                              : v == null || v === '' ? <span className="text-jj-gray-04">—</span>
+                            : c.key === 'chunk_count' ? <span className={v ? 'text-jj-gray-08' : 'text-jj-gray-06'}>{fmt(v)}</span>
+                              : v == null || v === '' ? <span className="text-jj-gray-06">—</span>
                                 : (
                                   <span className="flex items-center gap-1 min-w-0">
                                     <span className={`truncate ${c.key === 'object_name' ? 'text-jj-gray-08 font-medium' : 'text-jj-gray-07'}`} title={String(v)}>{v}</span>
@@ -872,7 +877,7 @@ function Documents({ state, setState, data, loading, error, onRetry, onOpen, can
               value={pageSize}
               onChange={e => setState(s => ({ ...s, pageSize: Number(e.target.value), page: 1 }))}
               aria-label="Rows per page"
-              className="h-8 pl-2.5 pr-7 rounded-full border border-jj-gray-02 bg-white text-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-jj-blue-03/40"
+              className="h-8 pl-2.5 pr-7 rounded-full border border-jj-gray-02 bg-white text-[12px]"
             >
               {[25, 50, 100, 250].map(n => <option key={n} value={n}>{n} / page</option>)}
             </select>
@@ -1066,7 +1071,7 @@ export default function RimIngestionExplorer({ logInPage, activeTab, onBusyChang
   /* ---------- render ---------- */
   if (sourcesError && !sources) {
     return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-jj-gray-01 p-4 sm:p-6">
+      <div className="ri-root flex-1 min-h-0 overflow-y-auto bg-jj-gray-01 p-4 sm:p-6">
         <style>{STYLES}</style>
         <ErrorCard message={sourcesError} onRetry={() => loadSources()} />
       </div>
@@ -1074,7 +1079,7 @@ export default function RimIngestionExplorer({ logInPage, activeTab, onBusyChang
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto ri-scroll bg-jj-gray-01">
+    <div className="ri-root flex-1 min-h-0 overflow-y-auto ri-scroll bg-jj-gray-01">
       <style>{STYLES}</style>
 
       {/* ── Command bar: source + page filters ── */}
@@ -1083,7 +1088,7 @@ export default function RimIngestionExplorer({ logInPage, activeTab, onBusyChang
         <div className="px-4 sm:px-6 py-3 flex flex-col gap-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative inline-flex items-center h-9 rounded-full border border-jj-gray-02 bg-white hover:border-jj-gray-03 focus-within:ring-2 focus-within:ring-jj-blue-03/40 min-w-0 max-w-full">
-              <Layers size={14} className="absolute left-3 text-jj-gray-06 pointer-events-none" aria-hidden="true" />
+              <Layers size={14} className="absolute left-3 text-jj-gray-07 pointer-events-none" aria-hidden="true" />
               <span className="sr-only">Chunks table</span>
               <select
                 value={source.table || ''}
@@ -1094,7 +1099,7 @@ export default function RimIngestionExplorer({ logInPage, activeTab, onBusyChang
                 {!sources && <option>Loading tables…</option>}
                 {(sources?.chunk_tables || []).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <ChevronDown size={14} className="absolute right-3 text-jj-gray-06 pointer-events-none" aria-hidden="true" />
+              <ChevronDown size={14} className="absolute right-3 text-jj-gray-07 pointer-events-none" aria-hidden="true" />
             </label>
             <div className="w-[min(280px,100%)]">
               <PickMenu
@@ -1121,7 +1126,8 @@ export default function RimIngestionExplorer({ logInPage, activeTab, onBusyChang
             />
             <div className="flex items-center gap-2 ml-auto">
               <span
-                className="hidden md:inline-flex items-center gap-2 text-[11.5px] font-johnson-text text-jj-gray-06 whitespace-nowrap"
+                role="status"
+                className="hidden md:inline-flex items-center gap-2 text-[11.5px] font-johnson-text text-jj-gray-07 whitespace-nowrap"
                 title={loadedAt ? `Matched ${easternStamp(loadedAt)}` : undefined}
               >
                 <span className={`w-2 h-2 rounded-full ${dashLoading ? 'bg-jj-orange-03' : live ? 'bg-jj-green-01 ri-live' : 'bg-jj-green-03'}`} />
@@ -1165,8 +1171,8 @@ export default function RimIngestionExplorer({ logInPage, activeTab, onBusyChang
             <div className="flex flex-wrap gap-1.5">
               {activePicks.map(c => (
                 <span key={`${c.id}:${c.value}`} className="inline-flex items-center gap-1.5 h-7 pl-3 pr-1.5 rounded-full bg-white border border-jj-gray-02 text-[11.5px] font-johnson-text text-jj-gray-08 ri-in">
-                  <span className="text-jj-gray-06">{c.label}:</span>{c.value}
-                  <button type="button" onClick={() => setPick(c.id, picks[c.id].filter(v => v !== c.value))} aria-label={`Remove ${c.label} ${c.value}`} className="w-5 h-5 rounded-full flex items-center justify-center text-jj-gray-06 hover:bg-jj-gray-01 hover:text-jj-gray-08">
+                  <span className="text-jj-gray-07">{c.label}:</span>{c.value}
+                  <button type="button" onClick={() => setPick(c.id, picks[c.id].filter(v => v !== c.value))} aria-label={`Remove ${c.label} ${c.value}`} className="w-6 h-6 rounded-full flex items-center justify-center text-jj-gray-07 hover:bg-jj-gray-01 hover:text-jj-gray-08">
                     <X size={12} aria-hidden="true" />
                   </button>
                 </span>
