@@ -16,11 +16,13 @@ const VirtualRegulatorExplorer = lazyPage(() => import('./components/VirtualRegu
 const VrExternalExplorer = lazyPage(() => import('./components/VrExternalExplorer'));
 const ImmbotExplorer = lazyPage(() => import('./components/ImmbotExplorer'));
 const CortellisExplorer = lazyPage(() => import('./components/CortellisExplorer'));
+const RimIngestionExplorer = lazyPage(() => import('./components/RimIngestionExplorer'));
 const EXPLORERS_BY_DOC_TYPE = {
   vr: [VirtualRegulatorExplorer, VrExternalExplorer, CortellisExplorer],
   immbot: [ImmbotExplorer],
   epod: [EpodExplorer],
   nipo: [NipoExplorer],
+  rimingest: [RimIngestionExplorer],
   fda: [FDAExplorer],
 };
 const preloadDocType = (id) => (EXPLORERS_BY_DOC_TYPE[id] || []).forEach(c => c.preload());
@@ -50,6 +52,7 @@ import safetyIcon from "/icons/JJ_Icon_Safety.svg";
 import leaderIcon from "/icons/JJ_Icon_Leader_RGB.svg";
 import aiIcon from "/icons/JJ_Icon_AI_RGB.svg";
 import editIcon from "/icons/JJ_Icon_Edit_RGB.svg";
+import checkIcon from "/icons/JJ_Icon_Check_RGB.svg";
 import { apiFetch, apiJson, downloadFile } from '../utils/apiClient';
 import SearchSection from '../components/SearchSection';
 import Arrow from '../components/Arrow';
@@ -215,6 +218,7 @@ const DOC_TYPE_LABELS = {
   mirai: 'MirAI',
   rmwcreate: 'RMWCreate',
   rimdocs: 'RimDocs',
+  rimingest: 'RIMDocs Ingestion',
   fda: 'FDA & Others',
   epod: 'EPOD',
   haq: 'Q!',
@@ -229,6 +233,7 @@ const DOC_TYPE_ICONS = {
   mirai: aiIcon,
   rmwcreate: editIcon,
   rimdocs: recordsIcon,
+  rimingest: checkIcon,
   fda: shieldIcon,
   epod: databaseIcon,
   haq: analysisIcon,
@@ -253,6 +258,7 @@ const VR_TAB_LABELS = { explore: 'Explore', table: 'Data table' };
 const VR_INTERNAL_TAB_LABELS = { explore: 'Overview', library: 'Documents', table: 'Data table' };
 const VR_EXT_FALLBACK = [{ id: 'press_releases', label: 'FDA Press Releases', kind: 'press' }];
 const IMMBOT_TAB_LABELS = { explore: 'Explore', table: 'Data table', breakdown: 'Breakdown' };
+const INGEST_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'breakdown', label: 'Breakdown' }, { id: 'documents', label: 'Documents' }];
 
 const FILTER_LABELS = {
   A_STATUS: "Status",
@@ -1882,6 +1888,8 @@ export default function Unstructured() {
   const [refreshing, setRefreshing] = useState(false);
   const [epodBusy, setEpodBusy] = useState(false);
   const [nipoBusy, setNipoBusy] = useState(false);
+  const [ingestBusy, setIngestBusy] = useState(false);
+  const [ingestSyncedAt, setIngestSyncedAt] = useState(null);
   const [fdaBusy, setFdaBusy] = useState(false);
   const [vrBusy, setVrBusy] = useState(false);
   const [vrSyncedAt, setVrSyncedAt] = useState(null);
@@ -1926,7 +1934,7 @@ export default function Unstructured() {
   // No doctype in the URL yet -> activeDocType is null and the welcome
   // screen (choose an explorer) renders instead of defaulting into one.
   // Only the sets this user has a permission for (UNSTRUCTURED_TABS).
-  const docTypeIds = ['vr', 'immbot', 'mirai', 'rmwcreate', 'haq', 'nipo', 'rimdocs', 'epod', 'fda']
+  const docTypeIds = ['vr', 'immbot', 'mirai', 'rmwcreate', 'haq', 'nipo', 'rimdocs', 'rimingest', 'epod', 'fda']
     .filter(id => hasPermission(UNSTRUCTURED_TABS[id]));
   // thin divider in the tab strip after this one (new chunk explorers | existing sets)
   const docTypeGroupEnd = 'rmwcreate';
@@ -2021,6 +2029,21 @@ export default function Unstructured() {
     setSearchParamsNav(prev => {
       const next = new URLSearchParams(prev);
       next.set('nipotab', id);
+      return next;
+    }, { replace: false });
+  };
+
+  // RIMDocs Ingestion sub-tabs (see RimIngestionExplorer).
+  const ingestTabIds = ['overview', 'breakdown', 'documents'].filter(canSub(UNSTRUCTURED_SUBTABS.rimingest));
+  const urlIngestTab = searchParamsNav.get('ingesttab');
+  const activeIngestTab = ingestTabIds.includes(urlIngestTab) ? urlIngestTab : ingestTabIds[0];
+  const setActiveIngestTab = (id) => {
+    if (id !== activeIngestTab) {
+      logInPage('ingest_tab_change', `Switched to "${INGEST_TABS.find(t => t.id === id)?.label}" tab on RIMDocs Ingestion`);
+    }
+    setSearchParamsNav(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('ingesttab', id);
       return next;
     }, { replace: false });
   };
@@ -3079,6 +3102,7 @@ export default function Unstructured() {
                   rimdocs: { busy, at: lastSyncedAt },
                   epod: { busy: epodBusy, at: null },
                   nipo: { busy: nipoBusy, at: null },
+                  rimingest: { busy: ingestBusy, at: ingestSyncedAt },
                   fda: { busy: fdaBusy, at: null },
                 }[activeDocType];
                 if (!pill) return null;
@@ -3426,6 +3450,28 @@ export default function Unstructured() {
           </div>
           )}
 
+          {activeDocType === 'rimingest' && ingestTabIds.length > 1 && (
+          <div className="flex items-center gap-2.5 flex-shrink-0 max-w-full overflow-x-auto">
+            <div role="tablist" aria-label="RIMDocs Ingestion views" className="flex bg-jj-gray-01/90 border border-jj-gray-02 rounded-full p-[3px] gap-0.5">
+              {INGEST_TABS.filter(t => ingestTabIds.includes(t.id)).map(tab => (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={activeIngestTab === tab.id}
+                  onClick={() => setActiveIngestTab(tab.id)}
+                  className={`px-4 py-[7px] rounded-full text-[12.5px] font-johnson-text whitespace-nowrap transition-colors ${
+                    activeIngestTab === tab.id
+                      ? 'bg-jj-gray-08 text-white font-medium'
+                      : 'text-jj-gray-07 hover:text-jj-gray-08'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          )}
+
           {activeDocType === 'fda' && (
           <div className="flex items-center gap-2.5 flex-shrink-0">
             <div className="flex bg-jj-gray-01/90 border border-jj-gray-02 rounded-full p-[3px] gap-0.5">
@@ -3607,6 +3653,8 @@ export default function Unstructured() {
         <EpodExplorer logInPage={logInPage} activeTab={activeEpodTab} onBusyChange={setEpodBusy} dataset={activeEpodDataset} />
       ) : activeDocType === 'nipo' ? (
         <NipoExplorer logInPage={logInPage} activeTab={activeNipoTab} onBusyChange={setNipoBusy} />
+      ) : activeDocType === 'rimingest' ? (
+        <RimIngestionExplorer logInPage={logInPage} activeTab={activeIngestTab} onBusyChange={setIngestBusy} onSynced={setIngestSyncedAt} />
       ) : activeDocType === 'fda' ? (
         <FDAExplorer logInPage={logInPage} activeTab={activeFdaTab} onBusyChange={setFdaBusy} dashboard={activeFdaDashboard} />
       ) : (

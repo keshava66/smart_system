@@ -244,6 +244,19 @@ for tab_id, label, extra, more in (
       parent="un.rimdocs", perms=extra, aliases=more,
       ambiguous_alone=tab_id in ("overview", "table"))
 
+d("un.rimingest", "RIMDocs Ingestion", "/unstructured-explorer", {"doctype": "rimingest"}, parent="unstructured",
+  perms=("viewUnstructuredRimIngestion",),
+  aliases=("rimdocs ingestion", "rim ingestion", "ingestion dashboard", "palm pah ingestion", "which documents are ingested",
+           "ingested documents", "doc chunks coverage"),
+  about="Which RIMDocs PALM/PAH documents made it into a doc_chunks table: Overview, Breakdown and Documents.")
+for tab_id, label, perm, more in (
+    ("overview", "Overview", "viewUnstructuredRimIngestionOverview", ("rimdocs ingestion overview", "ingestion coverage")),
+    ("breakdown", "Breakdown", "viewUnstructuredRimIngestionBreakdown", ("rimdocs ingestion breakdown",)),
+    ("documents", "Documents", "viewUnstructuredRimIngestionDocuments", ("rimdocs ingestion documents", "not ingested documents")),
+):
+    d(f"un.rimingest.{tab_id}", label, "/unstructured-explorer", {"doctype": "rimingest", "ingesttab": tab_id},
+      parent="un.rimingest", perms=(perm,), aliases=more, ambiguous_alone=tab_id != "documents")
+
 d("un.fda", "FDA and Others", "/unstructured-explorer", {"doctype": "fda"}, parent="unstructured", perms=("viewUnstructuredFDA",),
   aliases=("fda and others", "fda & others", "fda", "fda explorer", "crl", "complete response letters"),
   about="FDA and other regulatory data from Postgres, with a dashboard picker.")
@@ -474,9 +487,10 @@ ALLOWED_PARAMS = {
     "/communication-center": {"tab": {"compose", "whats-new", "queue", "history"}},
     "/data-studio": {"pane": {"snowflake", "postgres", "indexer", "s3", "streamsets", "shuttle"}, "bucket": None, "account": None, "prefix": None,
                      "key": None, "q": None, "view": {"search"}},
-    "/unstructured-explorer": {"doctype": {"vr", "immbot", "mirai", "rmwcreate", "rimdocs", "fda", "epod", "haq", "nipo"},
+    "/unstructured-explorer": {"doctype": {"vr", "immbot", "mirai", "rmwcreate", "rimdocs", "rimingest", "fda", "epod", "haq", "nipo"},
                                "tab": {"overview", "table", "breakdown"},
                                "epodtab": {"explore", "table"}, "nipotab": {"explore", "table"},
+                               "ingesttab": {"overview", "breakdown", "documents"},
                                "fdatab": {"explore", "table"},
                                "immbottab": {"explore", "table", "breakdown"},
                                "vrtab": {"explore", "library", "table"},

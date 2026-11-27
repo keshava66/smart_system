@@ -802,6 +802,16 @@ app.include_router(
 )
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── RIMDocs Ingestion routes (separate file — edit rim_ingestion.py, not here) ─
+from rim_ingestion import rim_ingestion_router, set_rim_ingestion_dependencies
+
+set_rim_ingestion_dependencies(CONFIG.get("postgres_query_runner") if CONFIG else None)
+app.include_router(
+    rim_ingestion_router,
+    dependencies=[Depends(require_permission("viewUnstructured", "viewUnstructuredRimIngestion"))],
+)
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ── FDA routes (separate file — edit fda.py, not here) ──────────────────────
 from fda import fda_router, set_fda_dependencies
 

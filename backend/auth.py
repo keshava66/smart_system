@@ -82,10 +82,11 @@ ALL_PERMISSIONS = [
     "sendCommunications",
     "viewUnstructuredVR", "viewUnstructuredIMMBOT", "viewUnstructuredMirAI",
     "viewUnstructuredRMWCreate", "viewUnstructuredHAQ", "viewUnstructuredNipo",
-    "viewUnstructuredRimDocs", "viewUnstructuredEPOD", "viewUnstructuredFDA",
+    "viewUnstructuredRimDocs", "viewUnstructuredRimIngestion", "viewUnstructuredEPOD", "viewUnstructuredFDA",
     "viewUnstructuredVRInternal", "viewUnstructuredVRExternal", "viewUnstructuredVRCortellis",
     "viewUnstructuredIMMBOTExplore", "viewUnstructuredIMMBOTTable", "viewUnstructuredIMMBOTBreakdown",
     "viewUnstructuredRimDocsExplore", "viewUnstructuredRimDocsTable", "viewUnstructuredRimDocsBreakdown",
+    "viewUnstructuredRimIngestionOverview", "viewUnstructuredRimIngestionBreakdown", "viewUnstructuredRimIngestionDocuments",
     "viewUnstructuredEPODExplore", "viewUnstructuredEPODTable",
     "viewUnstructuredNipoExplore", "viewUnstructuredNipoTable",
     "viewUnstructuredFDAExplore", "viewUnstructuredFDATable",
@@ -95,7 +96,7 @@ ALL_PERMISSIONS = [
 UNSTRUCTURED_TABS = (
     "viewUnstructuredVR", "viewUnstructuredIMMBOT", "viewUnstructuredMirAI",
     "viewUnstructuredRMWCreate", "viewUnstructuredHAQ", "viewUnstructuredNipo",
-    "viewUnstructuredRimDocs", "viewUnstructuredEPOD", "viewUnstructuredFDA",
+    "viewUnstructuredRimDocs", "viewUnstructuredRimIngestion", "viewUnstructuredEPOD", "viewUnstructuredFDA",
 )
 
 # Sub-tabs inside each document-set tab.
@@ -103,6 +104,8 @@ UNSTRUCTURED_SUBTABS: Dict[str, Tuple[str, ...]] = {
     "viewUnstructuredVR": ("viewUnstructuredVRInternal", "viewUnstructuredVRExternal", "viewUnstructuredVRCortellis"),
     "viewUnstructuredIMMBOT": ("viewUnstructuredIMMBOTExplore", "viewUnstructuredIMMBOTTable", "viewUnstructuredIMMBOTBreakdown"),
     "viewUnstructuredRimDocs": ("viewUnstructuredRimDocsExplore", "viewUnstructuredRimDocsTable", "viewUnstructuredRimDocsBreakdown"),
+    "viewUnstructuredRimIngestion": ("viewUnstructuredRimIngestionOverview", "viewUnstructuredRimIngestionBreakdown",
+                                     "viewUnstructuredRimIngestionDocuments"),
     "viewUnstructuredEPOD": ("viewUnstructuredEPODExplore", "viewUnstructuredEPODTable"),
     "viewUnstructuredNipo": ("viewUnstructuredNipoExplore", "viewUnstructuredNipoTable"),
     "viewUnstructuredFDA": ("viewUnstructuredFDAExplore", "viewUnstructuredFDATable"),
@@ -627,6 +630,14 @@ def with_evidence_flow(perms: Dict[str, Any], role: str) -> Dict[str, Any]:
     return {**perms, "viewEvidenceFlow": role == "admin"}
 
 
+def with_rim_ingestion(perms: Dict[str, Any], role: str) -> Dict[str, Any]:
+    """Roles saved before the RIMDocs Ingestion tab existed: admin gets it (its
+    sub-tabs follow in with_unstructured_tabs), everyone else needs it ticked."""
+    if "viewUnstructuredRimIngestion" in perms:
+        return perms
+    return {**perms, "viewUnstructuredRimIngestion": role == "admin" and perms.get("viewUnstructured") is True}
+
+
 def get_role_permissions(role: str, config: Optional[dict] = None) -> Dict[str, bool]:
     """Custom roles (and custom overrides of built-ins) win over defaults."""
     if config is None:
@@ -634,7 +645,7 @@ def get_role_permissions(role: str, config: Optional[dict] = None) -> Dict[str, 
     custom = (config.get("custom_roles") or {}).get(role)
     if custom and isinstance(custom.get("permissions"), dict):
         merged = {p: False for p in ALL_PERMISSIONS}
-        stored = with_evidence_flow(custom["permissions"], role)
+        stored = with_rim_ingestion(with_evidence_flow(custom["permissions"], role), role)
         stored = with_unstructured_downloads(with_snowflake_subperms(
             with_ind_cta_quality(with_bdc_standard(with_bdc_downloads(with_unstructured_tabs(with_data_studio_access(stored)))), role), role), role)
         merged.update({k: bool(v) for k, v in stored.items() if k in merged})

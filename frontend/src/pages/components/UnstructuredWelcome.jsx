@@ -10,6 +10,7 @@ import safetyIcon from "/icons/JJ_Icon_Safety.svg";
 import leaderIcon from "/icons/JJ_Icon_Leader_RGB.svg";
 import aiIcon from "/icons/JJ_Icon_AI_RGB.svg";
 import editIcon from "/icons/JJ_Icon_Edit_RGB.svg";
+import checkIcon from "/icons/JJ_Icon_Check_RGB.svg";
 import chevronRightIcon from "/icons/JJ_Icon_Chevron_Right.svg";
 
 // Brand tint recipe used across DQEngine: the source SVGs are flat black art,
@@ -28,8 +29,9 @@ const EXPLORERS = [
   { id: 'haq',       num: '05', name: 'Q!', description: 'Explore Q! content and metadata.', icon: analysisIcon },
   { id: 'nipo',      num: '06', name: 'Nipocalimab', description: 'Explore Nipocalimab documents and unstructured data.', icon: dataVizIcon },
   { id: 'rimdocs',   num: '07', name: 'RIMDocs', description: 'Explore RIMDocs documents and unstructured content.', icon: recordsIcon },
-  { id: 'epod',      num: '08', name: 'EPOD', description: 'Explore EPOD documents and records.', icon: databaseIcon },
-  { id: 'fda',       num: '09', name: 'FDA and Others', description: 'Explore FDA and other unstructured data and metadata.', icon: shieldIcon },
+  { id: 'rimingest', num: '08', name: 'RIMDocs Ingestion', description: 'See which RIMDocs documents made it into the chunk tables.', icon: checkIcon },
+  { id: 'epod',      num: '09', name: 'EPOD', description: 'Explore EPOD documents and records.', icon: databaseIcon },
+  { id: 'fda',       num: '10', name: 'FDA and Others', description: 'Explore FDA and other unstructured data and metadata.', icon: shieldIcon },
 ];
 
 // Keyframes are scoped to this screen and injected once, so the component can

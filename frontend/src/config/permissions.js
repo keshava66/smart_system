@@ -9,6 +9,7 @@ export const UNSTRUCTURED_TABS = {
   haq: 'viewUnstructuredHAQ',
   nipo: 'viewUnstructuredNipo',
   rimdocs: 'viewUnstructuredRimDocs',
+  rimingest: 'viewUnstructuredRimIngestion',
   epod: 'viewUnstructuredEPOD',
   fda: 'viewUnstructuredFDA',
 };
@@ -17,6 +18,7 @@ export const UNSTRUCTURED_SUBTABS = {
   vr: { internal: 'viewUnstructuredVRInternal', external: 'viewUnstructuredVRExternal', cortellis: 'viewUnstructuredVRCortellis' },
   immbot: { explore: 'viewUnstructuredIMMBOTExplore', table: 'viewUnstructuredIMMBOTTable', breakdown: 'viewUnstructuredIMMBOTBreakdown' },
   rimdocs: { overview: 'viewUnstructuredRimDocsExplore', table: 'viewUnstructuredRimDocsTable', breakdown: 'viewUnstructuredRimDocsBreakdown' },
+  rimingest: { overview: 'viewUnstructuredRimIngestionOverview', breakdown: 'viewUnstructuredRimIngestionBreakdown', documents: 'viewUnstructuredRimIngestionDocuments' },
   epod: { explore: 'viewUnstructuredEPODExplore', table: 'viewUnstructuredEPODTable' },
   nipo: { explore: 'viewUnstructuredNipoExplore', table: 'viewUnstructuredNipoTable' },
   fda: { explore: 'viewUnstructuredFDAExplore', table: 'viewUnstructuredFDATable' },

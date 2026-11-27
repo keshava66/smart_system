@@ -61,6 +61,7 @@ def frontend_values():
         ("/unstructured-explorer", "tab"): ids_in(block(un, r"const tabIds\s*=\s*\[", end=";")),
         ("/unstructured-explorer", "epodtab"): ids_in(block(un, r"const epodTabIds\s*=\s*\[")),
         ("/unstructured-explorer", "nipotab"): ids_in(block(un, r"const nipoTabIds\s*=\s*\[")),
+        ("/unstructured-explorer", "ingesttab"): ids_in(block(un, r"const ingestTabIds\s*=\s*\[")),
         ("/unstructured-explorer", "fdatab"): ids_in(block(un, r"const fdaTabIds\s*=\s*\[")),
         ("/unstructured-explorer", "immbottab"): ids_in(block(un, r"const immbotTabIds\s*=\s*\[")),
         ("/unstructured-explorer", "vrtab"): ids_in(block(un, r"const vrTabIds\s*=\s*\[")),

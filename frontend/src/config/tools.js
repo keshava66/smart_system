@@ -133,13 +133,14 @@ export const TOOL_CATALOG = [
       { label: 'Q!',                path: '/unstructured-explorer?doctype=haq',       permission: 'viewUnstructuredHAQ' },
       { label: 'Nipocalimab',       path: '/unstructured-explorer?doctype=nipo',      permission: 'viewUnstructuredNipo' },
       { label: 'RIMDocs',           path: '/unstructured-explorer?doctype=rimdocs',   permission: 'viewUnstructuredRimDocs' },
+      { label: 'RIMDocs Ingestion', path: '/unstructured-explorer?doctype=rimingest', permission: 'viewUnstructuredRimIngestion' },
       { label: 'EPOD',              path: '/unstructured-explorer?doctype=epod',      permission: 'viewUnstructuredEPOD' },
       { label: 'FDA and Others',    path: '/unstructured-explorer?doctype=fda',       permission: 'viewUnstructuredFDA' },
     ],
     trail: [
       ['doctype', {
         vr: 'Virtual Regulator', immbot: 'IMMBOT', mirai: 'MirAI', rmwcreate: 'RMWCreate', haq: 'Q!',
-        nipo: 'Nipocalimab', rimdocs: 'RIMDocs', epod: 'EPOD', fda: 'FDA and Others',
+        nipo: 'Nipocalimab', rimdocs: 'RIMDocs', rimingest: 'RIMDocs Ingestion', epod: 'EPOD', fda: 'FDA and Others',
       }],
     ],
   },

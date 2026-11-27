@@ -256,6 +256,12 @@ export const PERMISSION_GROUPS = [
           { key: 'viewUnstructuredRimDocsTable', label: 'Data table', description: 'Data table tab' },
           { key: 'viewUnstructuredRimDocsBreakdown', label: 'Domain breakdown', description: 'Domain breakdown tab' },
         ] },
+      { key: 'viewUnstructuredRimIngestion', label: 'RIMDocs Ingestion', description: 'RIMDocs Ingestion tab: which PALM/PAH documents made it into a doc_chunks table',
+        children: [
+          { key: 'viewUnstructuredRimIngestionOverview', label: 'Overview', description: 'Overview tab' },
+          { key: 'viewUnstructuredRimIngestionBreakdown', label: 'Breakdown', description: 'Breakdown tab' },
+          { key: 'viewUnstructuredRimIngestionDocuments', label: 'Documents', description: 'Documents tab' },
+        ] },
       { key: 'viewUnstructuredEPOD', label: 'EPOD', description: 'EPOD tab',
         children: [
           { key: 'viewUnstructuredEPODExplore', label: 'Explore', description: 'Explore tab' },
